@@ -16,14 +16,14 @@ from nose.tools import eq_, ok_, assert_raises
 import mock
 from lxml.etree import XMLSyntaxError
 
-from premailer.premailer import (
+from django_premailer.premailer import (
     transform,
     Premailer,
     merge_styles,
     ExternalNotFoundError,
 )
-from premailer.__main__ import main
-import premailer.premailer  # lint:ok
+from django_premailer.__main__ import main
+import django_premailer.premailer  # lint:ok
 
 
 whitespace_between_tags = re.compile('>\s*<')
@@ -510,7 +510,7 @@ class Tests(unittest.TestCase):
 
     def test_style_block_with_external_urls(self):
         """
-        From http://github.com/peterbe/premailer/issues/#issue/2
+        From http://github.com/peterbe/django_premailer/issues/#issue/2
 
         If you have
           body { background:url(http://example.com/bg.png); }
@@ -549,11 +549,11 @@ class Tests(unittest.TestCase):
 
     def test_shortcut_function(self):
         # you don't have to use this approach:
-        #   from premailer import Premailer
+        #   from django_premailer import Premailer
         #   p = Premailer(html, base_url=base_url)
         #   print p.transform()
         # You can do it this way:
-        #   from premailer import transform
+        #   from django_premailer import transform
         #   print transform(html, base_url=base_url)
 
         html = '''<html>
@@ -766,7 +766,7 @@ class Tests(unittest.TestCase):
         # stupidity test
         import os
 
-        html_file = os.path.join('premailer', 'tests',
+        html_file = os.path.join('django_premailer', 'tests',
                                  'test-apple-newsletter.html')
         html = open(html_file).read()
 
@@ -1411,7 +1411,7 @@ class Tests(unittest.TestCase):
         with captured_output() as (out, err):
             main([
                 '-f',
-                'premailer/tests/test-apple-newsletter.html',
+                'django_premailer/tests/test-apple-newsletter.html',
                 '--disable-basic-attributes=bgcolor'
             ])
 
@@ -1427,8 +1427,9 @@ class Tests(unittest.TestCase):
         with captured_output() as (out, err):
             main([
                 '-f',
-                'premailer/tests/test-issue78.html',
-                '--preserve-style-tags'
+                'django_premailer/tests/test-issue78.html',
+                '--preserve-style-tags',
+                '--external-style=django_premailer/tests/test-external-styles.css',
             ])
 
         result_html = out.getvalue().strip()
@@ -1452,7 +1453,8 @@ class Tests(unittest.TestCase):
         with captured_output() as (out, err):
             main([
                 '-f',
-                'premailer/tests/test-issue78.html',
+                'django_premailer/tests/test-issue78.html',
+                '--external-style=django_premailer/tests/test-external-styles.css',
             ])
 
         result_html = out.getvalue().strip()
@@ -1526,7 +1528,7 @@ class Tests(unittest.TestCase):
         h1 { color:red; }
         h3 { color:yellow; }
         </style>
-        <link href="premailer/tests/test-external-links.css" rel="stylesheet" type="text/css">
+        <link href="django_premailer/tests/test-external-links.css" rel="stylesheet" type="text/css">
         <link rel="alternate" type="application/rss+xml" title="RSS" href="/rss.xml">
         <style type="text/css">
         h1 { color:orange; }
@@ -1572,7 +1574,7 @@ class Tests(unittest.TestCase):
         h1 { color:red; }
         h3 { color:yellow; }
         </style>
-        <link href="premailer/xxxx.css" rel="stylesheet" type="text/css">
+        <link href="django_premailer/xxxx.css" rel="stylesheet" type="text/css">
         <style type="text/css">
         h1 { color:orange; }
         </style>
@@ -1632,30 +1634,30 @@ class Tests(unittest.TestCase):
             html,
             strip_important=False,
             external_styles='test-external-styles.css',
-            base_path='premailer/tests/')
+            base_path='django_premailer/tests/')
         result_html = p.transform()
 
         compare_html(expect_html, result_html)
 
-    @mock.patch('premailer.premailer.urlopen')
+    @mock.patch('django_premailer.django_premailer.urlopen')
     def test_load_external_url(self, mocked_url_open):
-        'Test premailer.premailer.Premailer._load_external_url'
+        'Test django_premailer.django_premailer.Premailer._load_external_url'
         faux_response = b'This is not a response'
         faux_uri = 'https://example.com/site.css'
         mocked_url_open.return_value = MockResponse(faux_response)
-        p = premailer.premailer.Premailer('<p>A paragraph</p>')
+        p = django_premailer.premailer.Premailer('<p>A paragraph</p>')
         r = p._load_external_url(faux_uri)
 
         mocked_url_open.assert_called_once_with(faux_uri)
         self.assertEqual(faux_response.decode('utf-8'), r)
 
-    @mock.patch('premailer.premailer.urlopen')
+    @mock.patch('django_premailer.django_premailer.urlopen')
     def test_load_external_url_gzip(self, mocked_url_open):
-        'Test premailer.premailer.Premailer._load_external_url with gzip'
+        'Test django_premailer.django_premailer.Premailer._load_external_url with gzip'
         faux_response = b'This is not a response'
         faux_uri = 'http://example.com/site.css'
         mocked_url_open.return_value = MockResponse(faux_response, True)
-        p = premailer.premailer.Premailer('<p>A paragraph</p>')
+        p = django_premailer.premailer.Premailer('<p>A paragraph</p>')
         r = p._load_external_url(faux_uri)
 
         mocked_url_open.assert_called_once_with(faux_uri)
@@ -1834,7 +1836,7 @@ class Tests(unittest.TestCase):
     def test_fontface_selectors_with_no_selectortext(self):
         """
         @font-face selectors are weird.
-        This is a fix for https://github.com/peterbe/premailer/issues/71
+        This is a fix for https://github.com/peterbe/django_premailer/issues/71
         """
         html = """<!doctype html>
         <html lang="en">

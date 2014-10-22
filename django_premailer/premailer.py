@@ -1,9 +1,5 @@
 from __future__ import absolute_import, unicode_literals, print_function
-try:
-    from collections import OrderedDict
-except ImportError:  # pragma: no cover
-    # some old python 2.6 thing then, eh?
-    from ordereddict import OrderedDict
+from collections import OrderedDict
 import sys
 import threading
 if sys.version_info >= (3, ):  # pragma: no cover
@@ -24,14 +20,10 @@ from lxml import etree
 from lxml.cssselect import CSSSelector
 
 
-__all__ = ['PremailerError', 'Premailer', 'transform']
+__all__ = ['PremailerError', 'Premailer']
 
 
 class PremailerError(Exception):
-    pass
-
-
-class ExternalNotFoundError(ValueError):
     pass
 
 
@@ -111,14 +103,25 @@ def make_important(bulk):
 
 _element_selector_regex = re.compile(r'(^|\s)\w')
 _cdata_regex = re.compile(r'\<\!\[CDATA\[(.*?)\]\]\>', re.DOTALL)
-# These selectors don't apply to all elements. Rather, they specify
-# which elements to apply to.
+# These selectors don't apply to all elements. Rather, they specify which elements to apply to.
 FILTER_PSEUDOSELECTORS = [':last-child', ':first-child', 'nth-child']
+
+
+class CSSLoader(object):
+
+    def __init__(self, files):
+        self.files = files
+
+    def __iter__(self):
+        for file in self.files:
+            f = open(file)
+            yield f.read()
 
 
 class Premailer(object):
 
-    def __init__(self, css_source, base_url=None,
+    def __init__(self,
+                 css_files, base_url=None,
                  preserve_internal_links=False,
                  preserve_inline_attachments=True,
                  exclude_pseudoclasses=True,
@@ -138,7 +141,9 @@ class Premailer(object):
         self.remove_classes = remove_classes
         # whether to process or ignore selectors like '* { foo:bar; }'
         self.include_star_selectors = include_star_selectors
-        self.css_source = css_source
+
+        self.css_source = CSSLoader(css_files)
+
         self.base_path = base_path
         if disable_basic_attributes is None:
             disable_basic_attributes = []
@@ -206,10 +211,6 @@ class Premailer(object):
         root = tree if stripped.startswith(tree.docinfo.doctype) else page
 
         assert page is not None
-
-        ##
-        ## style selectors
-        ##
 
         rules = []
         index = 0
@@ -351,14 +352,6 @@ if __name__ == '__main__':  # pragma: no cover
     html = """<html>
         <head>
         <title>Test</title>
-        <style>
-        h1, h2 { color:red; }
-        strong {
-          text-decoration:none
-          }
-        p { font-size:2px }
-        p.footer { font-size: 1px}
-        </style>
         </head>
         <body>
         <h1>Hi!</h1>
@@ -366,5 +359,5 @@ if __name__ == '__main__':  # pragma: no cover
         <p class="footer" style="color:red">Feetnuts</p>
         </body>
         </html>"""
-    p = Premailer(html)
-    print (p.transform())
+    p = Premailer(['thecss.css'])
+    print (p.transform(html))
