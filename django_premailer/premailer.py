@@ -1,5 +1,7 @@
 from __future__ import absolute_import, unicode_literals, print_function
 from collections import OrderedDict
+import operator
+import re
 import sys
 import threading
 if sys.version_info >= (3, ):  # pragma: no cover
@@ -7,27 +9,24 @@ if sys.version_info >= (3, ):  # pragma: no cover
     from urllib.parse import urljoin
     STR_TYPE = str
 else:  # Python 2
-    try:
-        from cStringIO import StringIO
-    except ImportError:  # pragma: no cover
-        from StringIO import StringIO  # lint:ok
     from urlparse import urljoin
     STR_TYPE = basestring
-import operator
-import re
 import cssutils
+
+
 from lxml import etree
 from lxml.cssselect import CSSSelector
+from django.core.cache import cache
+
+__all__ = ['Premailer']
 
 
-__all__ = ['PremailerError', 'Premailer']
-
-
-class PremailerError(Exception):
-    pass
-
-
+# compiled regular expresions
 grouping_regex = re.compile('([:\-\w]*){([^}]+)}')
+element_selector_regex = re.compile(r'(^|\s)\w')
+
+# These selectors don't apply to all elements. Rather, they specify which elements to apply to.
+FILTER_PSEUDOSELECTORS = [':last-child', ':first-child', 'nth-child']
 
 
 def merge_styles(old, new, class_=''):
@@ -101,27 +100,42 @@ def make_important(bulk):
     return ';'.join('%s !important' % p if not p.endswith('!important') else p for p in bulk.split(';'))
 
 
-_element_selector_regex = re.compile(r'(^|\s)\w')
-_cdata_regex = re.compile(r'\<\!\[CDATA\[(.*?)\]\]\>', re.DOTALL)
-# These selectors don't apply to all elements. Rather, they specify which elements to apply to.
-FILTER_PSEUDOSELECTORS = [':last-child', ':first-child', 'nth-child']
-
-
 class CSSLoader(object):
 
-    def __init__(self, files):
-        self.files = files
+    CACHE_KEY_PREFIX = 'premailer_1'
+
+    def __init__(self, files, premailer):
+        self.files = files if files else []
+        self.premailer = premailer
+
+    def _get_contents_key(self, filename, index):
+        return '%s_contents_%s_%s' % (self.CACHE_KEY_PREFIX, filename, index)
+
+    def get_cached_contents(self, filename, index):
+        return cache.get(self._get_contents_key(filename, index))
+
+    def create_and_save_contents(self, filename, index):
+        with open(filename) as f:
+            contents = f.read()
+            parsed = list(self.premailer.parse_style_rules(contents, index))
+            parsed.append(contents)
+            cache.set(self._get_contents_key(filename, index), parsed)
+        return parsed
 
     def __iter__(self):
-        for file in self.files:
-            f = open(file)
-            yield f.read()
+        for index, file in enumerate(self.files):
+            cached = self.get_cached_contents(file, index)
+            if cached:
+                yield cached
+            else:
+                yield self.create_and_save_contents(file, index)
 
 
 class Premailer(object):
 
     def __init__(self,
-                 css_files, base_url=None,
+                 css_files=None,
+                 base_url=None,
                  preserve_internal_links=False,
                  preserve_inline_attachments=True,
                  exclude_pseudoclasses=True,
@@ -130,7 +144,7 @@ class Premailer(object):
                  remove_classes=True,
                  base_path=None,
                  disable_basic_attributes=None,
-                 disable_validation=False):
+                 enable_validation=True):
         self.base_url = base_url
         self.preserve_internal_links = preserve_internal_links
         self.preserve_inline_attachments = preserve_inline_attachments
@@ -141,16 +155,16 @@ class Premailer(object):
         self.remove_classes = remove_classes
         # whether to process or ignore selectors like '* { foo:bar; }'
         self.include_star_selectors = include_star_selectors
-
-        self.css_source = CSSLoader(css_files)
-
+        self.css_source = CSSLoader(css_files, self)
         self.base_path = base_path
         if disable_basic_attributes is None:
             disable_basic_attributes = []
         self.disable_basic_attributes = disable_basic_attributes
-        self.disable_validation = disable_validation
 
-    def _parse_style_rules(self, css_body, ruleset_index):
+        # enable validation on the cssutils.CSSParser
+        self.enable_validation = enable_validation
+
+    def parse_style_rules(self, css_body, ruleset_index):
         leftover = []
         rules = []
         rule_index = 0
@@ -159,7 +173,7 @@ class Premailer(object):
         if not css_body:
             return rules, leftover
 
-        sheet = cssutils.parseString(css_body, validate=not self.disable_validation)
+        sheet = cssutils.parseString(css_body, validate=self.enable_validation)
         for rule in sheet:
             # handle media rule
             if rule.type == rule.MEDIA_RULE:
@@ -178,9 +192,8 @@ class Premailer(object):
                 if x.strip() and not x.strip().startswith('@')
             )
             for selector in selectors:
-                if (':' in selector and self.exclude_pseudoclasses and
-                    ':' + selector.split(':', 1)[1]
-                        not in FILTER_PSEUDOSELECTORS):
+                if (':' in selector and self.exclude_pseudoclasses
+                        and ':' + selector.split(':', 1)[1] not in FILTER_PSEUDOSELECTORS):
                     # a pseudoclass
                     leftover.append((selector, bulk))
                     continue
@@ -190,7 +203,7 @@ class Premailer(object):
                 # Crudely calculate specificity
                 id_count = selector.count('#')
                 class_count = selector.count('.')
-                element_count = len(_element_selector_regex.findall(selector))
+                element_count = len(element_selector_regex.findall(selector))
 
                 specificity = (id_count, class_count, element_count, ruleset_index, rule_index)
 
@@ -206,18 +219,18 @@ class Premailer(object):
         stripped = html.strip()
         tree = etree.fromstring(stripped, parser).getroottree()
         page = tree.getroot()
+
         # lxml inserts a doctype if none exists, so only include it in
         # the root if it was in the original html.
         root = tree if stripped.startswith(tree.docinfo.doctype) else page
 
         assert page is not None
 
-        rules = []
-        index = 0
+        # process style block
+        rules = self._process_style_block(page)
 
-        for css_body in self.css_source:
-            these_rules, these_leftover = self._parse_style_rules(css_body, index)
-            index += 1
+        # process external style sheets
+        for these_rules, these_leftover, css_body in self.css_source:
             rules.extend(these_rules)
             if these_leftover or self.keep_style_tags:
                 style = etree.Element('style')
@@ -235,6 +248,7 @@ class Premailer(object):
         rules.sort(key=operator.itemgetter(0))
 
         first_time = []
+        first_time_styles = []
         for __, selector, style in rules:
             new_selector = selector
             class_ = ''
@@ -250,9 +264,10 @@ class Premailer(object):
             sel = CSSSelector(selector)
             for item in sel(page):
                 old_style = item.attrib.get('style', '')
-                if not item in first_time:
+                if item in first_time:
                     new_style = merge_styles(old_style, style, class_)
                     first_time.append(item)
+                    first_time_styles.append((item, old_style))
                 else:
                     new_style = merge_styles(old_style, style, class_)
                 item.attrib['style'] = new_style
@@ -263,10 +278,51 @@ class Premailer(object):
 
         # transform relative paths to absolute URLs if required
         self._transform_urls(page)
-
+        kwargs.setdefault('method', 'html')
         kwargs.setdefault('pretty_print', pretty_print)
         kwargs.setdefault('encoding', 'utf-8')  # As Ken Thompson intended
         return etree.tostring(root, **kwargs).decode(kwargs['encoding'])
+
+    def _process_style_block(self, page):
+        index = 0
+        rules = []
+        for element in CSSSelector('style,link[rel~=stylesheet]')(page):
+            # If we have a media attribute whose value is anything other than
+            # 'screen', ignore the ruleset.
+            media = element.attrib.get('media')
+            if media and media != 'screen':
+                continue
+
+            is_style = element.tag == 'style'
+            if is_style:
+                css_body = element.text
+            else:
+                # we don't load any css files at this point
+                continue
+
+            these_rules, these_leftover = self.parse_style_rules(css_body, index)
+            index += 1
+            rules.extend(these_rules)
+
+            parent_of_element = element.getparent()
+            if these_leftover or self.keep_style_tags:
+                if is_style:
+                    style = element
+                else:
+                    style = etree.Element('style')
+                    style.attrib['type'] = 'text/css'
+                if self.keep_style_tags:
+                    style.text = css_body
+                else:
+                    style.text = css_rules_to_string(these_leftover)
+
+                if not is_style:
+                    element.addprevious(style)
+                    parent_of_element.remove(element)
+
+            elif not self.keep_style_tags or not is_style:
+                parent_of_element.remove(element)
+        return rules
 
     def _remove_css_classes(self, page):
         if self.remove_classes:
@@ -291,6 +347,7 @@ class Premailer(object):
                     parent.attrib[attr] = urljoin(self.base_url, parent.attrib[attr].lstrip('/'))
         return page
 
+
 CSS_HTML_ATTRIBUTE_MAPPING = {
     'text-align': ('align', lambda value: value.strip()),
     'vertical-align': ('valign', lambda value: value.strip()),
@@ -309,7 +366,6 @@ def style_to_basic_html_attributes(element, style_content, disable_basic_attribu
     """
     if style_content.count('}') and style_content.count('{') == style_content.count('{'):
         style_content = style_content.split('}')[0][1:]
-
     attributes = OrderedDict()
     for key, value in [
         x.split(':')
@@ -321,9 +377,8 @@ def style_to_basic_html_attributes(element, style_content, disable_basic_attribu
             continue
         else:
             attributes[new_key] = new_value(value)
-
     for key, value in attributes.items():
-        if key in element.attrib or key in disable_basic_attributes:
+        if key in disable_basic_attributes:
             # already set, don't dare to overwrite
             continue
         element.attrib[key] = value
@@ -346,18 +401,3 @@ def css_rules_to_string(rules):
                     rule.style[key] = (rule.style.getPropertyValue(key, False), '!important')
             lines.append(item.cssText)
     return '\n'.join(lines)
-
-
-if __name__ == '__main__':  # pragma: no cover
-    html = """<html>
-        <head>
-        <title>Test</title>
-        </head>
-        <body>
-        <h1>Hi!</h1>
-        <p><strong>Yes!</strong></p>
-        <p class="footer" style="color:red">Feetnuts</p>
-        </body>
-        </html>"""
-    p = Premailer(['thecss.css'])
-    print (p.transform(html))

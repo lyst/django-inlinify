@@ -41,11 +41,12 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     test_suite='nose.collector',
-    tests_require=['nose', 'mock'],
+    tests_require=['nose'],
     zip_safe=False,
     install_requires=[
         'lxml',
         'cssselect',
         'cssutils'
+        'django>1.5'
     ]
 )

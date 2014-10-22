@@ -31,10 +31,6 @@ def html_path(filename):
 
 class Tests(unittest.TestCase):
 
-    def shortDescription(self):
-        # most annoying thing in the world about nose
-        pass
-
     def test_merge_styles_basic(self):
         old = 'font-size:1px; color: red'
         new = 'font-size:2px; font-weight: bold'
@@ -1027,7 +1023,7 @@ class Tests(unittest.TestCase):
         </body>
         </html>"""
 
-        p = Premailer(disable_validation=True)
+        p = Premailer(enable_validation=False)
         result_html = p.transform(html)
 
         compare_html(expect_html, result_html)
@@ -1057,7 +1053,7 @@ class Tests(unittest.TestCase):
         <body></body>
         </html>"""
 
-        p = Premailer(disable_validation=True)
+        p = Premailer(enable_validation=False)
         p.transform(html)  # it should just work
 
     def test_keyframe_selectors(self):
@@ -1103,5 +1099,5 @@ class Tests(unittest.TestCase):
         <body></body>
         </html>"""
 
-        p = Premailer(disable_validation=True)
+        p = Premailer(enable_validation=False)
         p.transform(html)  # it should just work
