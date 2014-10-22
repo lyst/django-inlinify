@@ -140,7 +140,6 @@ class Premailer(object):
                  include_star_selectors=False,
                  remove_classes=True,
                  strip_important=True,
-                 external_styles=None,
                  base_path=None,
                  disable_basic_attributes=None,
                  disable_validation=False):
@@ -249,7 +248,6 @@ class Premailer(object):
         rules.sort(key=operator.itemgetter(0))
 
         first_time = []
-        first_time_styles = []
         for __, selector, style in rules:
             new_selector = selector
             class_ = ''
@@ -268,21 +266,11 @@ class Premailer(object):
                 if not item in first_time:
                     new_style = merge_styles(old_style, style, class_)
                     first_time.append(item)
-                    first_time_styles.append((item, old_style))
                 else:
                     new_style = merge_styles(old_style, style, class_)
                 item.attrib['style'] = new_style
                 self._style_to_basic_html_attributes(item, new_style,
                                                      force=True)
-
-        # Re-apply initial inline styles.
-        for item, inline_style in first_time_styles:
-            old_style = item.attrib.get('style', '')
-            if not inline_style:
-                continue
-            new_style = merge_styles(old_style, inline_style, class_)
-            item.attrib['style'] = new_style
-            self._style_to_basic_html_attributes(item, new_style, force=True)
 
         if self.remove_classes:
             # now we can delete all 'class' attributes
