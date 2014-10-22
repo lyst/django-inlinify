@@ -132,7 +132,7 @@ FILTER_PSEUDOSELECTORS = [':last-child', ':first-child', 'nth-child']
 
 class Premailer(object):
 
-    def __init__(self, base_url=None,
+    def __init__(self, css_source, base_url=None,
                  preserve_internal_links=False,
                  preserve_inline_attachments=True,
                  exclude_pseudoclasses=True,
@@ -154,9 +154,7 @@ class Premailer(object):
         self.remove_classes = remove_classes
         # whether to process or ignore selectors like '* { foo:bar; }'
         self.include_star_selectors = include_star_selectors
-        if isinstance(external_styles, STR_TYPE):
-            external_styles = [external_styles]
-        self.external_styles = external_styles
+        self.css_source = css_source
         self.strip_important = strip_important
         self.base_path = base_path
         if disable_basic_attributes is None:
@@ -231,59 +229,20 @@ class Premailer(object):
         rules = []
         index = 0
 
-        for element in CSSSelector('style,link[rel~=stylesheet]')(page):
-            # If we have a media attribute whose value is anything other than
-            # 'screen', ignore the ruleset.
-            media = element.attrib.get('media')
-            if media and media != 'screen':
-                continue
-
-            is_style = element.tag == 'style'
-            if is_style:
-                css_body = element.text
-            else:
-                href = element.attrib.get('href')
-                css_body = self._load_external(href)
-
+        for css_body in self.css_source:
             these_rules, these_leftover = self._parse_style_rules(css_body, index)
             index += 1
             rules.extend(these_rules)
-
-            parent_of_element = element.getparent()
             if these_leftover or self.keep_style_tags:
-                if is_style:
-                    style = element
-                else:
-                    style = etree.Element('style')
-                    style.attrib['type'] = 'text/css'
+                style = etree.Element('style')
+                style.attrib['type'] = 'text/css'
                 if self.keep_style_tags:
                     style.text = css_body
                 else:
                     style.text = self._css_rules_to_string(these_leftover)
-
-                if not is_style:
-                    element.addprevious(style)
-                    parent_of_element.remove(element)
-
-            elif not self.keep_style_tags or not is_style:
-                parent_of_element.remove(element)
-
-        if self.external_styles:
-            for stylefile in self.external_styles:
-                css_body = self._load_external(stylefile)
-                these_rules, these_leftover = self._parse_style_rules(css_body, index)
-                index += 1
-                rules.extend(these_rules)
-                if these_leftover or self.keep_style_tags:
-                    style = etree.Element('style')
-                    style.attrib['type'] = 'text/css'
-                    if self.keep_style_tags:
-                        style.text = css_body
-                    else:
-                        style.text = self._css_rules_to_string(these_leftover)
-                    head = CSSSelector('head')(page)
-                    if head:
-                        head[0].append(style)
+                head = CSSSelector('head')(page)
+                if head:
+                    head[0].append(style)
 
         # rules is a tuple of (specificity, selector, styles), where specificity is a tuple
         # ordered such that more specific rules sort larger.
@@ -355,47 +314,6 @@ class Premailer(object):
         if self.strip_important:
             out = _importants.sub('', out)
         return out
-
-    def _load_external_url(self, url):
-        r = urlopen(url)
-        _, params = cgi.parse_header(r.headers.get('Content-Type', ''))
-        encoding = params.get('charset', 'utf-8')
-        if 'gzip' in r.info().get('Content-Encoding', ''):
-            buf = BytesIO(r.read())
-            f = gzip.GzipFile(fileobj=buf)
-            out = f.read().decode(encoding)
-        else:
-            out = r.read().decode(encoding)
-        return out
-
-    def _load_external(self, url):
-        """loads an external stylesheet from a remote url or local path
-        """
-        if url.startswith('//'):
-            # then we have to rely on the base_url
-            if self.base_url and 'https://' in self.base_url:
-                url = 'https:' + url
-            else:
-                url = 'http:' + url
-
-        if url.startswith('http://') or url.startswith('https://'):
-            css_body = self._load_external_url(url)
-        else:
-            stylefile = url
-            if not os.path.isabs(stylefile):
-                stylefile = os.path.abspath(
-                    os.path.join(self.base_path or '', stylefile)
-                )
-            if os.path.exists(stylefile):
-                with codecs.open(stylefile, encoding='utf-8') as f:
-                    css_body = f.read()
-            elif self.base_url:
-                url = urljoin(self.base_url, url)
-                return self._load_external(url)
-            else:
-                raise ExternalNotFoundError(stylefile)
-
-        return css_body
 
     def _style_to_basic_html_attributes(self, element, style_content,
                                         force=False):
