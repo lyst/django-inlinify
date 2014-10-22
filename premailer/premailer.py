@@ -141,7 +141,6 @@ class Premailer(object):
                  remove_classes=True,
                  strip_important=True,
                  external_styles=None,
-                 method="html",
                  base_path=None,
                  disable_basic_attributes=None,
                  disable_validation=False):
@@ -160,7 +159,6 @@ class Premailer(object):
             external_styles = [external_styles]
         self.external_styles = external_styles
         self.strip_important = strip_important
-        self.method = method
         self.base_path = base_path
         if disable_basic_attributes is None:
             disable_basic_attributes = []
@@ -218,10 +216,7 @@ class Premailer(object):
         """change the self.html and return it with CSS turned into style
         attributes.
         """
-        if self.method == 'xml':
-            parser = etree.XMLParser(ns_clean=False, resolve_entities=False)
-        else:
-            parser = etree.HTMLParser()
+        parser = etree.HTMLParser()
         stripped = self.html.strip()
         tree = etree.fromstring(stripped, parser).getroottree()
         page = tree.getroot()
@@ -267,8 +262,6 @@ class Premailer(object):
                     style.text = css_body
                 else:
                     style.text = self._css_rules_to_string(these_leftover)
-                if self.method == 'xml':
-                    style.text = etree.CDATA(style.text)
 
                 if not is_style:
                     element.addprevious(style)
@@ -358,12 +351,9 @@ class Premailer(object):
                     parent.attrib[attr] = urljoin(self.base_url,
                         parent.attrib[attr].lstrip('/'))
 
-        kwargs.setdefault('method', self.method)
         kwargs.setdefault('pretty_print', pretty_print)
         kwargs.setdefault('encoding', 'utf-8')  # As Ken Thompson intended
         out = etree.tostring(root, **kwargs).decode(kwargs['encoding'])
-        if self.method == 'xml':
-            out = _cdata_regex.sub(lambda m: '/*<![CDATA[*/%s/*]]>*/' % m.group(1), out)
         if self.strip_important:
             out = _importants.sub('', out)
         return out
