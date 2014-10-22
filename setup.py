@@ -1,8 +1,3 @@
-import codecs
-import os.path
-import re
-import sys
-
 # Prevent spurious errors during `python setup.py test`, a la
 # http://www.eby-sarna.com/pipermail/peak/2010-May/003357.html:
 try:
@@ -12,52 +7,15 @@ except ImportError:
 
 from setuptools import setup, find_packages
 
-
-README = os.path.join(os.path.dirname(__file__), 'README.md')
-long_description = open(README).read().strip() + "\n\n"
-
-
-def md2stx(s):
-    import re
-    s = re.sub(':\n(\s{8,10})', r'::\n\1', s)
-    return s
-
-long_description = md2stx(long_description)
-
-
-def find_version(*file_paths):
-    version_file_path = os.path.join(os.path.dirname(__file__),
-                                     *file_paths)
-    version_file = codecs.open(version_file_path,
-                               encoding='utf-8').read()
-    version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]",
-                              version_file, re.M)
-    if version_match:
-        return version_match.group(1)
-    raise RuntimeError("Unable to find version string.")
-
-install_requires = [
-    'lxml',
-    'cssselect',
-    'cssutils',
-]
-if sys.version_info >= (2, 6) and sys.version_info <= (2, 7):
-    # Python 2.6 is the oldest version we support and it
-    # needs some extra stuff
-    install_requires.extend([
-        'argparse',
-        'ordereddict',
-    ])
-
 setup(
-    name='premailer',
-    version=find_version('premailer', '__init__.py'),
+    name='django-premailer',
+    version='0.0.2',
     description="Turns CSS blocks into style attributes",
-    long_description=long_description,
+    long_description="Turns CSS blocks into style attributes",
     keywords='html lxml email mail style',
-    author='Peter Bengtsson',
-    author_email='mail@peterbe.com',
-    url='http://github.com/peterbe/premailer',
+    author='Lyst Ltd.',
+    author_email='devs@lyst.com',
+    url='http://github.com/ssaw/',
     license='Python',
     classifiers=[
         "Development Status :: 5 - Production/Stable",
@@ -85,5 +43,9 @@ setup(
     test_suite='nose.collector',
     tests_require=['nose', 'mock'],
     zip_safe=False,
-    install_requires=install_requires,
+    install_requires=[
+        'lxml',
+        'cssselect',
+        'cssutils'
+    ]
 )

@@ -3,8 +3,7 @@
 dist
 build/
 *.egg
-premailer.egg-info
-premailer/gorunsettings.py
+django-premailer.egg-info
 .DS_Store
 .coverage
 .tox
