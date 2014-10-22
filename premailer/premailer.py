@@ -8,8 +8,6 @@ import sys
 import threading
 if sys.version_info >= (3, ):  # pragma: no cover
     # As in, Python 3
-    from io import StringIO
-    from urllib.request import urlopen
     from urllib.parse import urljoin
     STR_TYPE = str
 else:  # Python 2
@@ -17,15 +15,9 @@ else:  # Python 2
         from cStringIO import StringIO
     except ImportError:  # pragma: no cover
         from StringIO import StringIO  # lint:ok
-    from urllib2 import urlopen
     from urlparse import urljoin
     STR_TYPE = basestring
-from io import BytesIO  # Yes, there is an io module in Python 2
-import cgi
-import codecs
-import gzip
 import operator
-import os
 import re
 import cssutils
 from lxml import etree
@@ -124,7 +116,6 @@ def make_important(bulk):
 
 _element_selector_regex = re.compile(r'(^|\s)\w')
 _cdata_regex = re.compile(r'\<\!\[CDATA\[(.*?)\]\]\>', re.DOTALL)
-_importants = re.compile('\s*!important')
 # These selectors don't apply to all elements. Rather, they specify
 # which elements to apply to.
 FILTER_PSEUDOSELECTORS = [':last-child', ':first-child', 'nth-child']
@@ -139,7 +130,6 @@ class Premailer(object):
                  keep_style_tags=False,
                  include_star_selectors=False,
                  remove_classes=True,
-                 strip_important=True,
                  base_path=None,
                  disable_basic_attributes=None,
                  disable_validation=False):
@@ -154,7 +144,6 @@ class Premailer(object):
         # whether to process or ignore selectors like '* { foo:bar; }'
         self.include_star_selectors = include_star_selectors
         self.css_source = css_source
-        self.strip_important = strip_important
         self.base_path = base_path
         if disable_basic_attributes is None:
             disable_basic_attributes = []
@@ -272,36 +261,40 @@ class Premailer(object):
                 self._style_to_basic_html_attributes(item, new_style,
                                                      force=True)
 
+        # remove classes if required
+        self._remove_css_classes(page)
+
+        # transform relative paths to absolute URLs if required
+        self._transform_urls(page)
+
+        kwargs.setdefault('pretty_print', pretty_print)
+        kwargs.setdefault('encoding', 'utf-8')  # As Ken Thompson intended
+        return etree.tostring(root, **kwargs).decode(kwargs['encoding'])
+
+    def _remove_css_classes(self, page):
         if self.remove_classes:
-            # now we can delete all 'class' attributes
             for item in page.xpath('//@class'):
                 parent = item.getparent()
                 del parent.attrib['class']
+        return page
 
-        ##
-        ## URLs
-        ##
+    def _transform_urls(self, page):
         if self.base_url:
             for attr in ('href', 'src'):
                 for item in page.xpath("//@%s" % attr):
                     parent = item.getparent()
-                    if attr == 'href' and self.preserve_internal_links \
-                           and parent.attrib[attr].startswith('#'):
+                    if (attr == 'href' and self.preserve_internal_links
+                            and parent.attrib[attr].startswith('#')):
                         continue
-                    if attr == 'src' and self.preserve_inline_attachments \
-                           and parent.attrib[attr].startswith('cid:'):
+                    if (attr == 'src' and self.preserve_inline_attachments
+                            and parent.attrib[attr].startswith('cid:')):
                         continue
                     if not self.base_url.endswith('/'):
                         self.base_url += '/'
-                    parent.attrib[attr] = urljoin(self.base_url,
-                        parent.attrib[attr].lstrip('/'))
+                    parent.attrib[attr] = urljoin(self.base_url, parent.attrib[attr].lstrip('/'))
+        return page
 
-        kwargs.setdefault('pretty_print', pretty_print)
-        kwargs.setdefault('encoding', 'utf-8')  # As Ken Thompson intended
-        out = etree.tostring(root, **kwargs).decode(kwargs['encoding'])
-        if self.strip_important:
-            out = _importants.sub('', out)
-        return out
+
 
     def _style_to_basic_html_attributes(self, element, style_content,
                                         force=False):
