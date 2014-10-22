@@ -90,28 +90,23 @@ def merge_styles(old, new, class_=''):
     groups[class_] = merged
 
     if len(groups) == 1:
-        return '; '.join('%s:%s' % (k, v) for
-                          (k, v) in sorted(list(groups.values())[0]))
+        return '; '.join('%s:%s' % (k, v) for (k, v) in sorted(list(groups.values())[0]))
     else:
-        all = []
-        sorted_groups = sorted(list(groups.items()),
-                               key=lambda a: a[0].count(':'))
+        all_ = []
+        sorted_groups = sorted(list(groups.items()), key=lambda a: a[0].count(':'))
         for class_, mergeable in sorted_groups:
-            all.append('%s{%s}' % (class_,
-                                   '; '.join('%s:%s' % (k, v)
-                                              for (k, v)
-                                              in mergeable)))
-        return ' '.join(x for x in all if x != '{}')
+            all_.append('%s{%s}' % (class_, '; '.join('%s:%s' % (k, v) for k, v in mergeable)))
+        return ' '.join(x for x in all_ if x != '{}')
 
 # The lock is used in merge_styles function to work around threading concurrency bug of cssutils library.
 # The bug is documented in issue #65. The bug's reproduction test in test_premailer.test_multithreading.
 merge_styles._lock = threading.RLock()
 
+
 def make_important(bulk):
     """makes every property in a string !important.
     """
-    return ';'.join('%s !important' % p if not p.endswith('!important') else p
-                    for p in bulk.split(';'))
+    return ';'.join('%s !important' % p if not p.endswith('!important') else p for p in bulk.split(';'))
 
 
 _element_selector_regex = re.compile(r'(^|\s)\w')
@@ -154,9 +149,11 @@ class Premailer(object):
         leftover = []
         rules = []
         rule_index = 0
+
         # empty string
         if not css_body:
             return rules, leftover
+
         sheet = cssutils.parseString(css_body, validate=not self.disable_validation)
         for rule in sheet:
             # handle media rule
@@ -227,7 +224,7 @@ class Premailer(object):
                 if self.keep_style_tags:
                     style.text = css_body
                 else:
-                    style.text = self._css_rules_to_string(these_leftover)
+                    style.text = css_rules_to_string(these_leftover)
                 head = CSSSelector('head')(page)
                 if head:
                     head[0].append(style)
@@ -258,8 +255,7 @@ class Premailer(object):
                 else:
                     new_style = merge_styles(old_style, style, class_)
                 item.attrib['style'] = new_style
-                self._style_to_basic_html_attributes(item, new_style,
-                                                     force=True)
+                style_to_basic_html_attributes(item, new_style, self.disable_basic_attributes)
 
         # remove classes if required
         self._remove_css_classes(page)
@@ -294,67 +290,61 @@ class Premailer(object):
                     parent.attrib[attr] = urljoin(self.base_url, parent.attrib[attr].lstrip('/'))
         return page
 
+CSS_HTML_ATTRIBUTE_MAPPING = {
+    'text-align': ('align', lambda value: value.strip()),
+    'vertical-align': ('valign', lambda value: value.strip()),
+    'background-color': ('bgcolor', lambda value: value.strip()),
+    'width': ('width', lambda value: value.strip().replace('px', '')),
+    'height': ('height', lambda value: value.strip().replace('px', ''))
+}
 
 
-    def _style_to_basic_html_attributes(self, element, style_content,
-                                        force=False):
-        """given an element and styles like
-        'background-color:red; font-family:Arial' turn some of that into HTML
-        attributes. like 'bgcolor', etc.
+def style_to_basic_html_attributes(element, style_content, disable_basic_attributes):
+    """Given an element and styles like 'background-color:red; font-family:Arial' turn some of
+    that into HTML attributes
 
-        Note, the style_content can contain pseudoclasses like:
-        '{color:red; border:1px solid green} :visited{border:1px solid green}'
-        """
-        if style_content.count('}') and \
-          style_content.count('{') == style_content.count('{'):
-            style_content = style_content.split('}')[0][1:]
+    Note, the style_content can contain pseudoclasses like:
+    '{color:red; border:1px solid green} :visited{border:1px solid green}'
+    """
+    if style_content.count('}') and style_content.count('{') == style_content.count('{'):
+        style_content = style_content.split('}')[0][1:]
 
-        attributes = OrderedDict()
-        for key, value in [x.split(':') for x in style_content.split(';')
-                           if len(x.split(':')) == 2]:
-            key = key.strip()
+    attributes = OrderedDict()
+    for key, value in [
+        x.split(':')
+        for x in style_content.split(';') if len(x.split(':')) == 2
+    ]:
+        try:
+            new_key, new_value = CSS_HTML_ATTRIBUTE_MAPPING.get(key.strip(), None)
+        except TypeError:
+            continue
+        else:
+            attributes[new_key] = new_value(value)
 
-            if key == 'text-align':
-                attributes['align'] = value.strip()
-            elif key == 'vertical-align':
-                attributes['valign'] = value.strip()
-            elif key == 'background-color':
-                attributes['bgcolor'] = value.strip()
-            elif key == 'width' or key == 'height':
-                value = value.strip()
-                if value.endswith('px'):
-                    value = value[:-2]
-                attributes[key] = value
-            #else:
-            #    print "key", repr(key)
-            #    print 'value', repr(value)
+    for key, value in attributes.items():
+        if key in element.attrib or key in disable_basic_attributes:
+            # already set, don't dare to overwrite
+            continue
+        element.attrib[key] = value
 
-        for key, value in attributes.items():
-            if key in element.attrib and not force or key in self.disable_basic_attributes:
-                # already set, don't dare to overwrite
-                continue
-            element.attrib[key] = value
 
-    def _css_rules_to_string(self, rules):
-        """given a list of css rules returns a css string
-        """
-        lines = []
-        for item in rules:
-            if isinstance(item, tuple):
-                k, v = item
-                lines.append('%s {%s}' % (k, make_important(v)))
-            # media rule
-            else:
-                for rule in item.cssRules:
-                    if isinstance(rule, cssutils.css.csscomment.CSSComment):
-                        continue
-                    for key in rule.style.keys():
-                        rule.style[key] = (
-                            rule.style.getPropertyValue(key, False),
-                            '!important'
-                        )
-                lines.append(item.cssText)
-        return '\n'.join(lines)
+def css_rules_to_string(rules):
+    """Given a list of css rules returns a css string
+    """
+    lines = []
+    for item in rules:
+        if isinstance(item, tuple):
+            k, v = item
+            lines.append('%s {%s}' % (k, make_important(v)))
+        # media rule
+        else:
+            for rule in item.cssRules:
+                if isinstance(rule, cssutils.css.csscomment.CSSComment):
+                    continue
+                for key in rule.style.keys():
+                    rule.style[key] = (rule.style.getPropertyValue(key, False), '!important')
+            lines.append(item.cssText)
+    return '\n'.join(lines)
 
 
 if __name__ == '__main__':  # pragma: no cover
