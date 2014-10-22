@@ -132,7 +132,7 @@ FILTER_PSEUDOSELECTORS = [':last-child', ':first-child', 'nth-child']
 
 class Premailer(object):
 
-    def __init__(self, html, base_url=None,
+    def __init__(self, base_url=None,
                  preserve_internal_links=False,
                  preserve_inline_attachments=True,
                  exclude_pseudoclasses=True,
@@ -144,7 +144,6 @@ class Premailer(object):
                  base_path=None,
                  disable_basic_attributes=None,
                  disable_validation=False):
-        self.html = html
         self.base_url = base_url
         self.preserve_internal_links = preserve_internal_links
         self.preserve_inline_attachments = preserve_inline_attachments
@@ -212,12 +211,11 @@ class Premailer(object):
 
         return rules, leftover
 
-    def transform(self, pretty_print=True, **kwargs):
-        """change the self.html and return it with CSS turned into style
-        attributes.
+    def transform(self, html, pretty_print=True, **kwargs):
+        """Transform CSS into inline styles and inject them in the provided html
         """
         parser = etree.HTMLParser()
-        stripped = self.html.strip()
+        stripped = html.strip()
         tree = etree.fromstring(stripped, parser).getroottree()
         page = tree.getroot()
         # lxml inserts a doctype if none exists, so only include it in
@@ -458,10 +456,6 @@ class Premailer(object):
                         )
                 lines.append(item.cssText)
         return '\n'.join(lines)
-
-
-def transform(html, base_url=None):
-    return Premailer(html, base_url=base_url).transform()
 
 
 if __name__ == '__main__':  # pragma: no cover
