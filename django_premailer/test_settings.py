@@ -1,7 +1,7 @@
 # for testing, we'll use the default cache
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'
+        'BACKEND': 'django.core.cache.backends.dummy.DummyCache'
     }
 }
 
