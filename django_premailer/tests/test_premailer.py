@@ -7,10 +7,8 @@ import unittest
 
 from nose.tools import eq_, ok_
 
-from django_premailer.premailer import (
-    Premailer,
-    merge_styles,
-)
+from django_premailer.premailer import Premailer
+from django_premailer.css_tools import CSSParser
 
 whitespace_between_tags = re.compile('>\s*<')
 
@@ -44,31 +42,10 @@ class Tests(unittest.TestCase):
         old = 'font-size:1px; color: red'
         new = 'font-size:2px; font-weight: bold'
         expect = 'color:red;', 'font-size:2px;', 'font-weight:bold'
-        result = merge_styles(old, new)
+        parser = CSSParser()
+        result = parser.merge_styles(old, new)
         for each in expect:
             ok_(each in result)
-
-    def test_merge_styles_with_class(self):
-        old = 'color:red; font-size:1px;'
-        new, class_ = 'font-size:2px; font-weight: bold', ':hover'
-
-        # because we're dealing with dicts (random order) we have to
-        # test carefully.
-        # We expect something like this:
-        #  {color:red; font-size:1px} :hover{font-size:2px; font-weight:bold}
-
-        result = merge_styles(old, new, class_)
-        ok_(result.startswith('{'))
-        ok_(result.endswith('}'))
-        ok_(' :hover{' in result)
-        split_regex = re.compile('{([^}]+)}')
-        eq_(len(split_regex.findall(result)), 2)
-        expect_first = 'color:red', 'font-size:1px'
-        expect_second = 'font-weight:bold', 'font-size:2px'
-        for each in expect_first:
-            ok_(each in split_regex.findall(result)[0])
-        for each in expect_second:
-            ok_(each in split_regex.findall(result)[1])
 
     def test_merge_styles_non_trivial(self):
         old = 'background-image:url("data:image/png;base64,iVBORw0KGg")'
@@ -78,9 +55,11 @@ class Tests(unittest.TestCase):
             'font-size:2px;',
             'font-weight:bold'
         )
-        result = merge_styles(old, new)
+        parser = CSSParser()
+        result = parser.merge_styles(old, new)
         for each in expect:
             ok_(each in result)
+
 
     def test_basic_html(self):
         """test the simplest case"""
@@ -282,7 +261,7 @@ class Tests(unittest.TestCase):
 
     def test_parse_style_rules(self):
         p = Premailer()  # won't need the html
-        func = p.parse_style_rules
+        func = p.css_parser.parse
         rules, leftover = func("""
         h1, h2 { color:red; }
         /* ignore
@@ -314,7 +293,7 @@ class Tests(unittest.TestCase):
         ok_('a:hover' not in rules_dict)
 
         p = Premailer(exclude_pseudoclasses=True)  # won't need the html
-        func = p.parse_style_rules
+        func = p.css_parser.parse
         rules, leftover = func("""
         ul li {  list-style: 2px; }
         a:hover { text-decoration: underline }
@@ -325,13 +304,11 @@ class Tests(unittest.TestCase):
         eq_(k, 'ul li')
         eq_(v, 'list-style:2px')
 
-        eq_(len(leftover), 1)
-        k, v = leftover[0]
-        eq_((k, v), ('a:hover', 'text-decoration:underline'), (k, v))
+        eq_(leftover, 'a:hover {text-decoration:underline !important}')
 
     def test_precedence_comparison(self):
         p = Premailer()  # won't need the html
-        rules, leftover = p.parse_style_rules("""
+        rules, leftover = p.css_parser.parse("""
         #identified { color:blue; }
         h1, h2 { color:red; }
         ul li {  list-style: 2px; }
@@ -490,45 +467,6 @@ class Tests(unittest.TestCase):
         else:
             message = '"{0}" not in HTML'.format(fragment)
         ok_(fragment in html, message)
-
-    def test_css_with_pseudoclasses_included(self):
-        """Pick up the pseudoclasses too and include them
-        """
-
-        html = '''<html>
-        <head>
-        <style type="text/css">
-        a.special:link { text-decoration:none; }
-        a { color:red; }
-        a:hover { text-decoration:none; }
-        a,a:hover,
-        a:visited { border:1px solid green; }
-        p::first-letter {float: left; font-size: 300%}
-        </style>
-        </head>
-        <body>
-        <a href="#" class="special">Special!</a>
-        <a href="#">Page</a>
-        <p>Paragraph</p>
-        </body>
-        </html>'''
-
-        p = Premailer(exclude_pseudoclasses=False)
-        result_html = p.transform(html)
-
-        # because we're dealing with random dicts here we can't predict what
-        # order the style attribute will be written in so we'll look for
-        # things manually.
-        e = '<p style="::first-letter{float:left; font-size:300%}">'\
-            'Paragraph</p>'
-        self.fragment_in_html(e, result_html, True)
-
-        e = 'style="{border:1px solid green; color:red}'
-        self.fragment_in_html(e, result_html)
-        e = ' :visited{border:1px solid green}'
-        self.fragment_in_html(e, result_html)
-        e = ' :hover{border:1px solid green; text-decoration:none}'
-        self.fragment_in_html(e, result_html)
 
     def test_css_with_html_attributes(self):
         """Some CSS styles can be applied as normal HTML attribute like
@@ -953,54 +891,6 @@ class Tests(unittest.TestCase):
         result_html = p.transform(html)
 
         compare_html(expect_html, result_html)
-
-    def test_multithreading(self):
-        """The test tests thread safety of merge_styles function which employs
-        thread non-safe cssutils calls.
-        The test would fail if merge_styles would have not been thread-safe """
-
-        import threading
-        import logging
-        THREADS = 30
-        REPEATS = 100
-
-        class RepeatMergeStylesThread(threading.Thread):
-            """The thread is instantiated by test and run multiple times in parallel."""
-            exc = None
-
-            def __init__(self, old, new, class_):
-                """The constructor just stores merge_styles parameters"""
-                super(RepeatMergeStylesThread, self).__init__()
-                self.old, self.new, self.class_ = old, new, class_
-
-            def run(self):
-                """Calls merge_styles in a loop and sets exc attribute if merge_styles raises an exception."""
-                for i in range(0, REPEATS):
-                    try:
-                        merge_styles(self.old, self.new, self.class_)
-                    except Exception as e:
-                        logging.exception("Exception in thread %s", self.name)
-                        self.exc = e
-
-        old = 'background-color:#ffffff;'
-        new = 'background-color:#dddddd;'
-        class_ = ''
-
-        # start multiple threads concurrently; each calls merge_styles many times
-        threads = [
-            RepeatMergeStylesThread(old, new, class_)
-            for i in range(0, THREADS)
-        ]
-        for t in threads:
-            t.start()
-
-        # wait until all threads are done
-        for t in threads:
-            t.join()
-
-        # check if any thread raised exception while in merge_styles call
-        exceptions = [t.exc for t in threads if t.exc is not None]
-        eq_(exceptions, [])
 
     def test_disabled_validator(self):
         """test disabled_validator"""
