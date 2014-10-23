@@ -16,7 +16,7 @@ import cssutils
 
 from lxml import etree
 from lxml.cssselect import CSSSelector
-from django.core.cache import cache
+from django_premailer.css_loader import CSSLoader
 
 __all__ = ['Premailer']
 
@@ -98,37 +98,6 @@ def make_important(bulk):
     """makes every property in a string !important.
     """
     return ';'.join('%s !important' % p if not p.endswith('!important') else p for p in bulk.split(';'))
-
-
-class CSSLoader(object):
-
-    CACHE_KEY_PREFIX = 'premailer_1'
-
-    def __init__(self, files, premailer):
-        self.files = files if files else []
-        self.premailer = premailer
-
-    def _get_contents_key(self, filename, index):
-        return '%s_contents_%s_%s' % (self.CACHE_KEY_PREFIX, filename, index)
-
-    def get_cached_contents(self, filename, index):
-        return cache.get(self._get_contents_key(filename, index))
-
-    def create_and_save_contents(self, filename, index):
-        with open(filename) as f:
-            contents = f.read()
-            parsed = list(self.premailer.parse_style_rules(contents, index))
-            parsed.append(contents)
-            cache.set(self._get_contents_key(filename, index), parsed)
-        return parsed
-
-    def __iter__(self):
-        for index, file in enumerate(self.files):
-            cached = self.get_cached_contents(file, index)
-            if cached:
-                yield cached
-            else:
-                yield self.create_and_save_contents(file, index)
 
 
 class Premailer(object):

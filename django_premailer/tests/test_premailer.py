@@ -1,7 +1,10 @@
 from __future__ import absolute_import, unicode_literals
+import os
+from os.path import dirname, abspath
+from os.path import join as joinpath
 import re
 import unittest
-import os
+
 from nose.tools import eq_, ok_
 
 from django_premailer.premailer import (
@@ -24,9 +27,15 @@ def compare_html(one, two):
         if line.lstrip() != other.lstrip():
             eq_(line.lstrip(), other.lstrip())
 
+ROOT = abspath(joinpath(dirname(__file__)))
+
 
 def html_path(filename):
-    return os.path.join('/Users', 'jesus', 'django-premailer','django_premailer','tests', 'html', filename)
+    return os.path.join(ROOT, 'html', filename)
+
+
+def css_path(filename):
+    return os.path.join(ROOT, 'css', filename)
 
 
 class Tests(unittest.TestCase):
@@ -1101,3 +1110,30 @@ class Tests(unittest.TestCase):
 
         p = Premailer(enable_validation=False)
         p.transform(html)  # it should just work
+
+    def test_parsing_from_css_local_file(self):
+        """Tests that css parsing from a local file works
+        """
+        html = """<html>
+        <head>
+        <title>Title</title>
+        </head>
+        <body>
+        <h1>Hi!</h1>
+        <p><strong>Yes!</strong></p>
+        </body>
+        </html>"""
+
+        expect_html = """<html>
+        <head>
+        <title>Title</title>
+        </head>
+        <body>
+        <h1 style="color:red">Hi!</h1>
+        <p><strong style="text-decoration:none">Yes!</strong></p>
+        </body>
+        </html>"""
+
+        p = Premailer(css_files=[css_path('test_parsing_from_css_local_file.css')])
+        result_html = p.transform(html)
+        compare_html(expect_html, result_html)
