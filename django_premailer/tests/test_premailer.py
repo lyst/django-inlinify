@@ -1027,3 +1027,142 @@ class Tests(unittest.TestCase):
         p = Premailer(css_files=[css_path('test_parsing_from_css_local_file.css')])
         result_html = p.transform(html)
         compare_html(expect_html, result_html)
+
+    def test_ignore_style_elements_with_media_attribute(self):
+        """Asserts that style elements with media attributes other than
+        'screen' are ignored."""
+
+        html = """<html>
+        <head>
+        <title>Title</title>
+        <style type="text/css">
+            h1, h2 { color:red; }
+            strong {
+                text-decoration:none
+            }
+        </style>
+        <style type="text/css" media="screen">
+            h1, h2 { color:green; }
+            p {
+                font-size:16px;
+                }
+        </style>
+        <style type="text/css" media="only screen and (max-width: 480px)">
+            h1, h2 { color:orange; }
+            p {
+                font-size:120%;
+            }
+        </style>
+        </head>
+        <body>
+        <h1>Hi!</h1>
+        <p><strong>Yes!</strong></p>
+        </body>
+        </html>"""
+
+        expect_html = """<html>
+        <head>
+        <title>Title</title>
+        <style type="text/css" media="only screen and (max-width: 480px)">
+            h1, h2 { color:orange; }
+            p {
+                font-size:120%;
+            }
+        </style>
+        </head>
+        <body>
+        <h1 style="color:green">Hi!</h1>
+        <p style="font-size:16px"><strong style="text-decoration:none">Yes!</strong></p>
+        </body>
+        </html>"""
+
+        p = Premailer()
+        result_html = p.transform(html)
+
+        compare_html(expect_html, result_html)
+
+    def test_style_attribute_specificity(self):
+            """Stuff already in style attributes beats style tags."""
+
+            html = """<html>
+            <head>
+            <title>Title</title>
+            <style type="text/css">
+            h1 { color: pink }
+            h1.foo { color: blue }
+            </style>
+            </head>
+            <body>
+            <h1 class="foo" style="color: green">Hi!</h1>
+            </body>
+            </html>"""
+
+            expect_html = """<html>
+            <head>
+            <title>Title</title>
+            </head>
+            <body>
+            <h1 style="color:green">Hi!</h1>
+            </body>
+            </html>"""
+
+            p = Premailer()
+            result_html = p.transform(html)
+
+            compare_html(expect_html, result_html)
+
+    def test_leftover_important(self):
+        """Asserts that leftover styles should be marked as !important."""
+
+        html = """<html>
+        <head>
+        <title>Title</title>
+        <style type="text/css">
+        a { color: red; }
+        a:hover { color: green; }
+        a:focus { color: blue !important; }
+        </style>
+        </head>
+        <body>
+        <a href="#">Hi!</a>
+        </body>
+        </html>"""
+
+        expect_html = """<html>
+        <head>
+        <title>Title</title>
+        <style type="text/css">
+        a { color: red; }
+        a:hover { color: green; }
+        a:focus { color: blue !important; }
+        </style>
+        </head>
+        <body>
+        <a href="#" style="color:red">Hi!</a>
+        </body>
+        </html>"""
+
+        p = Premailer(keep_style_tags=True)
+        result_html = p.transform(html)
+
+        compare_html(expect_html, result_html)
+
+    def test_comments_in_media_queries(self):
+            """CSS comments inside a media query block should not be a problem"""
+            html = """<!doctype html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <title>Document</title>
+                <style>
+                @media screen {
+                    /* comment */
+                }
+                </style>
+            </head>
+            <body></body>
+            </html>"""
+
+            p = Premailer(disable_validation=True)
+            result_html = p.transform(html)
+            ok_('/* comment */' in result_html)

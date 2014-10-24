@@ -4,13 +4,16 @@ import requests
 import cssutils
 from django.core.cache import get_cache, InvalidCacheBackendError
 from django.conf import settings
+from django_premailer import defaults
 from StringIO import StringIO
 from contextlib import closing
 from hashlib import md5
 
 log = logging.getLogger('django_premailer.css_loader')
 
-DEFAULT_CACHE_BACKEND_NAME = getattr(settings, 'DEFAULT_CACHE_BACKEND_NAME', 'default')
+DEFAULT_CACHE_BACKEND_NAME = getattr(settings,
+                                     'DEFAULT_CACHE_BACKEND_NAME',
+                                     defaults.DEFAULT_CACHE_BACKEND_NAME)
 
 FILTER_PSEUDOSELECTORS = [':last-child', ':first-child', 'nth-child']
 element_selector_regex = re.compile(r'(^|\s)\w')
@@ -41,15 +44,19 @@ class CSSLoader(object):
     """Class responsible for loading CSS files. Supports local and remote files
     """
 
-    CACHE_KEY_PREFIX = 'premailer_file_content_cache_'
-    CACHE_KEY_TTL = 60 * 60 * 12
+    CSSLOADER_CACHE_KEY_PREFIX = getattr(settings,
+                                         'CSSLOADER_CACHE_KEY_PREFIX',
+                                         defaults.CSSLOADER_CACHE_KEY_PREFIX)
+    CSSLOADER_CACHE_KEY_TTL = getattr(settings,
+                                      'CSSLOADER_CACHE_KEY_TTL',
+                                      defaults.CSSLOADER_CACHE_KEY_TTL)
 
     def __init__(self, files, cache_backend=None):
         self.files = files if files else []
         self.cache = load_cache(cache_backend)
 
     def _get_cache_key(self, filepath):
-        return '%s_filecontents_%s_' % (self.CACHE_KEY_PREFIX, filepath)
+        return '%s_filecontents_%s_' % (self.CSSLOADER_CACHE_KEY_PREFIX, filepath)
 
     def _get_cached_contents(self, filename):
         return self.cache.get(self._get_cache_key(filename))
@@ -102,7 +109,15 @@ class CSSParser(object):
     """Class responsible for parsing CSS
     """
 
-    CACHE_KEY_PREFIX = 'premailer_parsed_css_cache_'
+    CSSPARSER_CACHE_KEY_PREFIX = getattr(settings,
+                                         'CSSPARSER_CACHE_KEY_PREFIX',
+                                         defaults.CSSPARSER_CACHE_KEY_PREFIX)
+    CSSPARSER_CACHE_KEY_TTL = getattr(settings,
+                                      'CSSPARSER_CACHE_KEY_TTL',
+                                      defaults.CSSPARSER_CACHE_KEY_PREFIX)
+    CSS_HTML_ATTRIBUTE_MAPPING = getattr(settings,
+                                         'CSS_HTML_ATTRIBUTE_MAPPING',
+                                         defaults.CSS_HTML_ATTRIBUTE_MAPPING)
 
     def __init__(self, cache_backend=None, **kwargs):
         self.cache = load_cache(cache_backend)
@@ -112,7 +127,7 @@ class CSSParser(object):
 
     def _get_cache_key(self, css_body, index):
         h = md5(str(css_body)).hexdigest()
-        return '%s_contents_%s_%s' % (self.CACHE_KEY_PREFIX, h, index)
+        return '%s_contents_%s_%s' % (self.CSSPARSER_CACHE_KEY_PREFIX, h, index)
 
     def _get_cached_css(self, css_body, index):
         return self.cache.get(self._get_cache_key(css_body, index))
@@ -284,3 +299,27 @@ class CSSParser(object):
             chunks = css_property.split(':', 1)
             d[chunks[0].strip()] = chunks[1].strip()
         return d
+
+    def css_style_to_basic_html_attributes(self, element, style_content, disable_basic_attributes):
+        """Given an element and styles like 'background-color:red; font-family:Arial' turn some of
+        that into HTML attributes
+
+        Note, the style_content can contain pseudoclasses like:
+        '{color:red; border:1px solid green} :visited{border:1px solid green}'
+        """
+        if style_content.count('}') and style_content.count('{') == style_content.count('}'):
+            style_content = style_content.split('}')[0][1:]
+
+        for key, value in [
+            x.split(':')
+            for x in style_content.split(';') if len(x.split(':')) == 2
+        ]:
+            try:
+                new_key, new_value = self.CSS_HTML_ATTRIBUTE_MAPPING.get(key.strip(), None)
+            except TypeError:
+                continue
+            else:
+                if new_key in disable_basic_attributes:
+                    # already set, don't dare to overwrite
+                    continue
+                element.attrib[new_key] = new_value(value)

@@ -1,5 +1,4 @@
 from __future__ import absolute_import, unicode_literals
-from collections import OrderedDict
 import operator
 import sys
 if sys.version_info >= (3, ):  # pragma: no cover
@@ -26,24 +25,24 @@ class Premailer(object):
                  preserve_inline_attachments=True,
                  keep_style_tags=False,
                  remove_classes=True,
-                 base_path=None,
                  disable_basic_attributes=None,
                  **kwargs):
+
+        # attributes required by the URL parser
         self.base_url = base_url
         self.preserve_internal_links = preserve_internal_links
         self.preserve_inline_attachments = preserve_inline_attachments
-        # whether to delete the <style> tag once it's been processed
-        # this will always preserve the original css
-        self.keep_style_tags = keep_style_tags
-        self.remove_classes = remove_classes
 
+        # whether to delete the <style> tag once it's been processed
+        self.keep_style_tags = keep_style_tags
+        # remove all the class attributes
+        self.remove_classes = remove_classes
+        # when mapping CSS to HTML attributes, exclude the following HTML attributes
+        self.disable_basic_attributes = disable_basic_attributes or []
+
+        # initialize parser and loader
         self.css_parser = CSSParser(**kwargs)
         self.css_source = CSSLoader(css_files)
-
-        self.base_path = base_path
-        if disable_basic_attributes is None:
-            disable_basic_attributes = []
-        self.disable_basic_attributes = disable_basic_attributes
 
     def transform(self, html, pretty_print=True, **kwargs):
         """Transform CSS into inline styles and inject them in the provided html
@@ -69,12 +68,17 @@ class Premailer(object):
         # ordered such that more specific rules sort larger.
         rules.sort(key=operator.itemgetter(0))
 
-        for __, selector, style in rules:
+        original_styles = {}
+        for __, selector, new_style in rules:
             sel = CSSSelector(selector)
             for item in sel(page):
-                merged = self.css_parser.merge_styles(item.attrib.get('style', ''), style)
-                item.attrib['style'] = merged
-                style_to_basic_html_attributes(item, merged, self.disable_basic_attributes)
+                current_style = item.attrib.get('style', '')
+                if item not in original_styles:
+                    original_styles[item] = current_style
+                self._update_element_style(item, current_style, new_style)
+
+        # re-apply the original inline styles
+        self._reapply_original_inline_styles(original_styles)
 
         # remove classes if required
         self._remove_css_classes(page)
@@ -133,6 +137,22 @@ class Premailer(object):
                 parent_of_element.remove(element)
         return rules
 
+    def _reapply_original_inline_styles(self, original):
+        """Re-applies all the initial inline styles
+        """
+        for item, inline_style in original.iteritems():
+            if not inline_style:
+                continue
+            self._update_element_style(item, item.attrib.get('style', ''), inline_style)
+
+    def _update_element_style(self, element, current, new):
+        """Given an element, its current style and a new one, merges them and updates the element
+        """
+        new_style = self.css_parser.merge_styles(current, new)
+        element.attrib['style'] = new_style
+        self.css_parser.css_style_to_basic_html_attributes(element, new_style,
+                                                           self.disable_basic_attributes)
+
     def _remove_css_classes(self, page):
         if self.remove_classes:
             for item in page.xpath('//@class'):
@@ -155,39 +175,3 @@ class Premailer(object):
                         self.base_url += '/'
                     parent.attrib[attr] = urljoin(self.base_url, parent.attrib[attr].lstrip('/'))
         return page
-
-
-CSS_HTML_ATTRIBUTE_MAPPING = {
-    'text-align': ('align', lambda value: value.strip()),
-    'vertical-align': ('valign', lambda value: value.strip()),
-    'background-color': ('bgcolor', lambda value: value.strip()),
-    'width': ('width', lambda value: value.strip().replace('px', '')),
-    'height': ('height', lambda value: value.strip().replace('px', ''))
-}
-
-
-def style_to_basic_html_attributes(element, style_content, disable_basic_attributes):
-    """Given an element and styles like 'background-color:red; font-family:Arial' turn some of
-    that into HTML attributes
-
-    Note, the style_content can contain pseudoclasses like:
-    '{color:red; border:1px solid green} :visited{border:1px solid green}'
-    """
-    if style_content.count('}') and style_content.count('{') == style_content.count('{'):
-        style_content = style_content.split('}')[0][1:]
-    attributes = OrderedDict()
-    for key, value in [
-        x.split(':')
-        for x in style_content.split(';') if len(x.split(':')) == 2
-    ]:
-        try:
-            new_key, new_value = CSS_HTML_ATTRIBUTE_MAPPING.get(key.strip(), None)
-        except TypeError:
-            continue
-        else:
-            attributes[new_key] = new_value(value)
-    for key, value in attributes.items():
-        if key in disable_basic_attributes:
-            # already set, don't dare to overwrite
-            continue
-        element.attrib[key] = value
