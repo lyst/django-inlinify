@@ -97,7 +97,7 @@ class CSSLoader(object):
             contents = self._get_file_contents_from_url(filepath)
         else:
             contents = self._get_file_contents_from_local_file(filepath)
-        self.cache.set(self._get_cache_key(filepath), contents)
+        self.cache.set(self._get_cache_key(filepath), contents, self.CSSLOADER_CACHE_KEY_TTL)
         return contents
 
     def __iter__(self):
@@ -114,7 +114,7 @@ class CSSParser(object):
                                          defaults.CSSPARSER_CACHE_KEY_PREFIX)
     CSSPARSER_CACHE_KEY_TTL = getattr(settings,
                                       'CSSPARSER_CACHE_KEY_TTL',
-                                      defaults.CSSPARSER_CACHE_KEY_PREFIX)
+                                      defaults.CSSPARSER_CACHE_KEY_TTL)
     CSS_HTML_ATTRIBUTE_MAPPING = getattr(settings,
                                          'CSS_HTML_ATTRIBUTE_MAPPING',
                                          defaults.CSS_HTML_ATTRIBUTE_MAPPING)
@@ -140,7 +140,8 @@ class CSSParser(object):
         if cached:
             return cached
         parsed = self._parse_style_rules(css_body, ruleset_index)
-        self.cache.set(self._get_cache_key(css_body, ruleset_index), parsed, 1000)
+        self.cache.set(self._get_cache_key(css_body, ruleset_index), parsed,
+                       self.CSSPARSER_CACHE_KEY_TTL)
         return parsed
 
     def _parse_style_rules(self, css_body, ruleset_index):
