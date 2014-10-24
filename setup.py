@@ -9,7 +9,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='django-premailer',
-    version='0.0.8',
+    version='0.0.9',
     description="Turns CSS blocks into style attributes",
     long_description="Turns CSS blocks into style attributes",
     keywords='html lxml email mail style',

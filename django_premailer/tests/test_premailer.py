@@ -1082,34 +1082,34 @@ class Tests(unittest.TestCase):
         compare_html(expect_html, result_html)
 
     def test_style_attribute_specificity(self):
-            """Stuff already in style attributes beats style tags."""
+        """Stuff already in style attributes beats style tags."""
 
-            html = """<html>
-            <head>
-            <title>Title</title>
-            <style type="text/css">
-            h1 { color: pink }
-            h1.foo { color: blue }
-            </style>
-            </head>
-            <body>
-            <h1 class="foo" style="color: green">Hi!</h1>
-            </body>
-            </html>"""
+        html = """<html>
+        <head>
+        <title>Title</title>
+        <style type="text/css">
+        h1 { color: pink }
+        h1.foo { color: blue }
+        </style>
+        </head>
+        <body>
+        <h1 class="foo" style="color: green">Hi!</h1>
+        </body>
+        </html>"""
 
-            expect_html = """<html>
-            <head>
-            <title>Title</title>
-            </head>
-            <body>
-            <h1 style="color:green">Hi!</h1>
-            </body>
-            </html>"""
+        expect_html = """<html>
+        <head>
+        <title>Title</title>
+        </head>
+        <body>
+        <h1 style="color:green">Hi!</h1>
+        </body>
+        </html>"""
 
-            p = Premailer()
-            result_html = p.transform(html)
+        p = Premailer()
+        result_html = p.transform(html)
 
-            compare_html(expect_html, result_html)
+        compare_html(expect_html, result_html)
 
     def test_leftover_important(self):
         """Asserts that leftover styles should be marked as !important."""
@@ -1148,21 +1148,58 @@ class Tests(unittest.TestCase):
         compare_html(expect_html, result_html)
 
     def test_comments_in_media_queries(self):
-            """CSS comments inside a media query block should not be a problem"""
-            html = """<!doctype html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <title>Document</title>
-                <style>
-                @media screen {
-                    /* comment */
-                }
-                </style>
-            </head>
-            <body></body>
-            </html>"""
+        """CSS comments inside a media query block should not be a problem"""
+        html = """<!doctype html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>Document</title>
+            <style>
+            @media screen {
+                /* comment */
+            }
+            </style>
+        </head>
+        <body></body>
+        </html>"""
 
-            p = Premailer(disable_validation=True)
-            result_html = p.transform(html)
-            ok_('/* comment */' in result_html)
+        p = Premailer(enable_validation=False)
+        result_html = p.transform(html)
+        ok_('/* comment */' in result_html)
+
+    def test_existing_style_blocks_are_kept(self):
+        """Asserts that leftover styles should be marked as !important."""
+
+        html = """<html>
+        <head>
+        <title>Title</title>
+        <style type="text/css">
+        a { color: red; }
+        </style>
+        </head>
+        <body>
+        <a href="#">Hi!</a>
+        </body>
+        </html>"""
+
+        expect_html = """<html>
+        <head>
+        <title>Title</title>
+        <style type="text/css">
+        a { color: red; }
+        </style>
+        <style type="text/css">@media all and (min-width: 600px) {
+            a {
+                font-size: 12px !important
+            }
+        }</style>
+        </head>
+        <body>
+        <a href="#" style="color:red">Hi!</a>
+        </body>
+        </html>"""
+
+        p = Premailer(css_files=[css_path('test_existing_style_blocks_are_kept.css')],
+                      keep_style_tags=True)
+        result_html = p.transform(html)
+        compare_html(expect_html, result_html)
