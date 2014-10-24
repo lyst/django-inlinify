@@ -85,9 +85,7 @@ class CSSLoader(object):
         """
         cached = self._get_cached_contents(filepath)
         if cached:
-            print 'Returning cached contents'
             return cached
-        print 'Obtaining contents'
         if filepath.startswith('http://') or filepath.startswith('https://'):
             contents = self._get_file_contents_from_url(filepath)
         else:
@@ -125,9 +123,7 @@ class CSSParser(object):
         """
         cached = self._get_cached_css(css_body, ruleset_index)
         if cached:
-            print 'Returning cached css'
             return cached
-        print 'Generating css'
         parsed = self._parse_style_rules(css_body, ruleset_index)
         self.cache.set(self._get_cache_key(css_body, ruleset_index), parsed, 1000)
         return parsed
@@ -149,9 +145,11 @@ class CSSParser(object):
             if rule.type == rule.MEDIA_RULE:
                 leftover.append(rule)
                 continue
+
             # only proceed for things we recognize
             if rule.type != rule.STYLE_RULE:
                 continue
+
             bulk = ';'.join(
                 u'{0}:{1}'.format(key, rule.style[key])
                 for key in rule.style.keys()

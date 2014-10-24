@@ -53,8 +53,8 @@ class Premailer(object):
         tree = etree.fromstring(stripped, parser).getroottree()
         page = tree.getroot()
 
-        # lxml inserts a doctype if none exists, so only include it in
-        # the root if it was in the original html.
+        # lxml inserts a doctype if none exists, so only include it in the root if it was in
+        # the original html
         root = tree if stripped.startswith(tree.docinfo.doctype) else page
 
         assert page is not None
@@ -81,9 +81,11 @@ class Premailer(object):
 
         # transform relative paths to absolute URLs if required
         self._transform_urls(page)
+
+        # set some default options
         kwargs.setdefault('method', 'html')
         kwargs.setdefault('pretty_print', pretty_print)
-        kwargs.setdefault('encoding', 'utf-8')  # As Ken Thompson intended
+        kwargs.setdefault('encoding', 'utf-8')
         return etree.tostring(root, **kwargs).decode(kwargs['encoding'])
 
     def _process_external_files(self, page):
@@ -108,43 +110,26 @@ class Premailer(object):
     def _process_style_block(self, page):
         """Processes the <style> block in the HTML
         """
-        index = 0
         rules = []
-        for element in CSSSelector('style,link[rel~=stylesheet]')(page):
-            # If we have a media attribute whose value is anything other than
-            # 'screen', ignore the ruleset.
+        for index, element in enumerate(CSSSelector('style')(page)):
+            # If we have a media attribute whose value is anything other than 'screen',
+            # ignore the ruleset.
             media = element.attrib.get('media')
             if media and media != 'screen':
                 continue
 
-            is_style = element.tag == 'style'
-            if is_style:
-                css_body = element.text
-            else:
-                # we don't load any css files at this point
-                continue
-
+            css_body = element.text
             these_rules, these_leftover = self.css_parser.parse(css_body, index)
-            index += 1
             rules.extend(these_rules)
 
             parent_of_element = element.getparent()
             if these_leftover or self.keep_style_tags:
-                if is_style:
-                    style = element
-                else:
-                    style = etree.Element('style')
-                    style.attrib['type'] = 'text/css'
+                style = element
                 if self.keep_style_tags:
                     style.text = css_body
                 else:
                     style.text = these_leftover
-
-                if not is_style:
-                    element.addprevious(style)
-                    parent_of_element.remove(element)
-
-            elif not self.keep_style_tags or not is_style:
+            elif not self.keep_style_tags:
                 parent_of_element.remove(element)
         return rules
 
