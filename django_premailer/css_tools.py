@@ -11,9 +11,9 @@ from hashlib import md5
 
 log = logging.getLogger('django_premailer.css_loader')
 
-DEFAULT_CACHE_BACKEND_NAME = getattr(settings,
-                                     'DEFAULT_CACHE_BACKEND_NAME',
-                                     defaults.DEFAULT_CACHE_BACKEND_NAME)
+DJANGO_PREMAILER_DEFAULT_CACHE_BACKEND_NAME = getattr(settings,
+                                            'DJANGO_PREMAILER_DEFAULT_CACHE_BACKEND_NAME',
+                                            defaults.DJANGO_PREMAILER_DEFAULT_CACHE_BACKEND_NAME)
 
 FILTER_PSEUDOSELECTORS = [':last-child', ':first-child', 'nth-child']
 element_selector_regex = re.compile(r'(^|\s)\w')
@@ -30,13 +30,13 @@ def load_cache(cache_name):
         cache object
     """
     if not cache_name:
-        return get_cache(DEFAULT_CACHE_BACKEND_NAME)
+        return get_cache(DJANGO_PREMAILER_DEFAULT_CACHE_BACKEND_NAME)
     try:
         cache = get_cache(cache_name)
     except InvalidCacheBackendError:
         log.error('The cache you specified (%s) is not defined in settings. Falling back to '
-                  'the default one (%s)', cache_name, DEFAULT_CACHE_BACKEND_NAME)
-        cache = get_cache(DEFAULT_CACHE_BACKEND_NAME)
+                  'the default one (%s)', cache_name, DJANGO_PREMAILER_DEFAULT_CACHE_BACKEND_NAME)
+        cache = get_cache(DJANGO_PREMAILER_DEFAULT_CACHE_BACKEND_NAME)
     return cache
 
 
@@ -44,19 +44,19 @@ class CSSLoader(object):
     """Class responsible for loading CSS files. Supports local and remote files
     """
 
-    CSSLOADER_CACHE_KEY_PREFIX = getattr(settings,
-                                         'CSSLOADER_CACHE_KEY_PREFIX',
-                                         defaults.CSSLOADER_CACHE_KEY_PREFIX)
-    CSSLOADER_CACHE_KEY_TTL = getattr(settings,
-                                      'CSSLOADER_CACHE_KEY_TTL',
-                                      defaults.CSSLOADER_CACHE_KEY_TTL)
+    DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_PREFIX = getattr(settings,
+                                         'DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_PREFIX',
+                                         defaults.DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_PREFIX)
+    DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_TTL = getattr(settings,
+                                      'DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_TTL',
+                                      defaults.DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_TTL)
 
     def __init__(self, files, cache_backend=None):
         self.files = files if files else []
         self.cache = load_cache(cache_backend)
 
     def _get_cache_key(self, filepath):
-        return '%s_filecontents_%s_' % (self.CSSLOADER_CACHE_KEY_PREFIX, filepath)
+        return '%s_filecontents_%s_' % (self.DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_PREFIX, filepath)
 
     def _get_cached_contents(self, filename):
         return self.cache.get(self._get_cache_key(filename))
@@ -97,7 +97,7 @@ class CSSLoader(object):
             contents = self._get_file_contents_from_url(filepath)
         else:
             contents = self._get_file_contents_from_local_file(filepath)
-        self.cache.set(self._get_cache_key(filepath), contents, self.CSSLOADER_CACHE_KEY_TTL)
+        self.cache.set(self._get_cache_key(filepath), contents, self.DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_TTL)
         return contents
 
     def __iter__(self):
@@ -109,15 +109,15 @@ class CSSParser(object):
     """Class responsible for parsing CSS
     """
 
-    CSSPARSER_CACHE_KEY_PREFIX = getattr(settings,
-                                         'CSSPARSER_CACHE_KEY_PREFIX',
-                                         defaults.CSSPARSER_CACHE_KEY_PREFIX)
-    CSSPARSER_CACHE_KEY_TTL = getattr(settings,
-                                      'CSSPARSER_CACHE_KEY_TTL',
-                                      defaults.CSSPARSER_CACHE_KEY_TTL)
-    CSS_HTML_ATTRIBUTE_MAPPING = getattr(settings,
-                                         'CSS_HTML_ATTRIBUTE_MAPPING',
-                                         defaults.CSS_HTML_ATTRIBUTE_MAPPING)
+    DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_PREFIX = getattr(settings,
+                                         'DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_PREFIX',
+                                         defaults.DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_PREFIX)
+    DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_TTL = getattr(settings,
+                                      'DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_TTL',
+                                      defaults.DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_TTL)
+    DJANGO_PREMAILER_CSS_HTML_ATTRIBUTE_MAPPING = getattr(settings,
+                                         'DJANGO_PREMAILER_CSS_HTML_ATTRIBUTE_MAPPING',
+                                         defaults.DJANGO_PREMAILER_CSS_HTML_ATTRIBUTE_MAPPING)
 
     def __init__(self, cache_backend=None, **kwargs):
         self.cache = load_cache(cache_backend)
@@ -127,7 +127,7 @@ class CSSParser(object):
 
     def _get_cache_key(self, css_body, index):
         h = md5(str(css_body)).hexdigest()
-        return '%s_contents_%s_%s' % (self.CSSPARSER_CACHE_KEY_PREFIX, h, index)
+        return '%s_contents_%s_%s' % (self.DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_PREFIX, h, index)
 
     def _get_cached_css(self, css_body, index):
         return self.cache.get(self._get_cache_key(css_body, index))
@@ -141,7 +141,7 @@ class CSSParser(object):
             return cached
         parsed = self._parse_style_rules(css_body, ruleset_index)
         self.cache.set(self._get_cache_key(css_body, ruleset_index), parsed,
-                       self.CSSPARSER_CACHE_KEY_TTL)
+                       self.DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_TTL)
         return parsed
 
     def _parse_style_rules(self, css_body, ruleset_index):
@@ -316,7 +316,7 @@ class CSSParser(object):
             for x in style_content.split(';') if len(x.split(':')) == 2
         ]:
             try:
-                new_key, new_value = self.CSS_HTML_ATTRIBUTE_MAPPING.get(key.strip(), None)
+                new_key, new_value = self.DJANGO_PREMAILER_CSS_HTML_ATTRIBUTE_MAPPING.get(key.strip(), None)
             except TypeError:
                 continue
             else:
