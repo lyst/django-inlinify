@@ -34,19 +34,19 @@ Override the following in your Django settings according to your needs. You can 
 
 ```python
 # the default cache backend. Make sure it exists in `CACHES`
-DEFAULT_CACHE_BACKEND_NAME
+DJANGO_PREMAILER_DEFAULT_CACHE_BACKEND_NAME
 
 # CSS parser cache key prefix
-CSSPARSER_CACHE_KEY_PREFIX
+DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_PREFIX
 # CSS parser cache key TTL
-CSSPARSER_CACHE_KEY_TTL
+DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_TTL
 # CSS attribute to HTML attribute mapping
-CSS_HTML_ATTRIBUTE_MAPPING
+DJANGO_PREMAILER_CSS_HTML_ATTRIBUTE_MAPPING
 
 # CSS loader cache key prefix
-CSSLOADER_CACHE_KEY_PREFIX
+DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_PREFIX
 # CSS loader cache key TTL
-CSSLOADER_CACHE_KEY_TTL
+DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_TTL
 ```
 
 Running tests
@@ -59,4 +59,4 @@ DJANGO_SETTINGS_MODULE="django_premailer.test_settings" python setup.py test
 Version
 ----
 
-0.0.8
+0.0.11
