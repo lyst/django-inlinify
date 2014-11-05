@@ -1,0 +1,17 @@
+h1, h2 {
+    color: red;
+}
+
+/* ignore
+    this */
+strong {
+    text-decoration: none;
+}
+
+ul li {
+    list-style: 2px;
+}
+
+a:hover {
+    text-decoration: underline;
+}

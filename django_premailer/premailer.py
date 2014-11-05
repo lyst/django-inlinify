@@ -23,22 +23,12 @@ class Premailer(object):
                  base_url=None,
                  preserve_internal_links=False,
                  preserve_inline_attachments=True,
-                 keep_style_tags=False,
-                 remove_classes=True,
-                 disable_basic_attributes=None,
                  **kwargs):
 
         # attributes required by the URL parser
         self.base_url = base_url
         self.preserve_internal_links = preserve_internal_links
         self.preserve_inline_attachments = preserve_inline_attachments
-
-        # whether to delete the <style> tag once it's been processed
-        self.keep_style_tags = keep_style_tags
-        # remove all the class attributes
-        self.remove_classes = remove_classes
-        # when mapping CSS to HTML attributes, exclude the following HTML attributes
-        self.disable_basic_attributes = disable_basic_attributes or []
 
         # initialize parser and loader
         self.css_parser = CSSParser(**kwargs)
@@ -80,9 +70,6 @@ class Premailer(object):
         # re-apply the original inline styles
         self._reapply_original_inline_styles(original_styles)
 
-        # remove classes if required
-        self._remove_css_classes(page)
-
         # transform relative paths to absolute URLs if required
         self._transform_urls(page)
 
@@ -99,7 +86,7 @@ class Premailer(object):
         for index, css_body in enumerate(self.css_source):
             these_rules, these_leftover = self.css_parser.parse(css_body, index)
             rules.extend(these_rules)
-            if these_leftover or self.keep_style_tags:
+            if these_leftover:
                 style = etree.Element('style')
                 style.attrib['type'] = 'text/css'
                 style.text = these_leftover
@@ -123,15 +110,6 @@ class Premailer(object):
             these_rules, these_leftover = self.css_parser.parse(css_body, index)
             rules.extend(these_rules)
 
-            parent_of_element = element.getparent()
-            if these_leftover or self.keep_style_tags:
-                style = element
-                if self.keep_style_tags:
-                    style.text = css_body
-                else:
-                    style.text = these_leftover
-            elif not self.keep_style_tags:
-                parent_of_element.remove(element)
         return rules
 
     def _reapply_original_inline_styles(self, original):
@@ -147,15 +125,7 @@ class Premailer(object):
         """
         new_style = self.css_parser.merge_styles(current, new)
         element.attrib['style'] = new_style
-        self.css_parser.css_style_to_basic_html_attributes(element, new_style,
-                                                           self.disable_basic_attributes)
-
-    def _remove_css_classes(self, page):
-        if self.remove_classes:
-            for item in page.xpath('//@class'):
-                parent = item.getparent()
-                del parent.attrib['class']
-        return page
+        self.css_parser.css_style_to_basic_html_attributes(element, new_style)
 
     def _transform_urls(self, page):
         if self.base_url:

@@ -1,0 +1,39 @@
+#identified {
+    color: blue;
+}
+
+h1, h2 {
+    color: red;
+}
+
+ul li {
+    list-style: 2px;
+}
+
+li.example {
+    color: green;
+}
+
+strong {
+    text-decoration: none;
+}
+
+div li.example p.sample {
+    color: black;
+}
+
+div {
+    color: red;
+}
+
+div.with-class {
+    color: blue;
+}
+
+.class-one {
+    color: green;
+}
+
+.class-one.class-two {
+    color: hotpink;
+}
