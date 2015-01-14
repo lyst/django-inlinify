@@ -222,6 +222,16 @@ class Tests(unittest.TestCase):
         expected_output = read_html_file('test_last_child_expected.html')
         compare_html(expected_output, Premailer().transform(html))
 
+    def test_nth_child(self):
+        """
+        :nth-child selector should work correctly.
+        """
+
+        html = read_html_file('test_nth_child_input.html')
+        expected_output = read_html_file('test_nth_child_expected.html')
+        compare_html(expected_output,
+                     Premailer(css_files=[css_path('test_nth_child.css')]).transform(html))
+
     def test_child_selector(self):
         """
         CSS child selectors should work correctly.

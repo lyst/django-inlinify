@@ -11,12 +11,21 @@ from hashlib import md5
 
 log = logging.getLogger('django_premailer.css_loader')
 
-DJANGO_PREMAILER_DEFAULT_CACHE_BACKEND_NAME = getattr(settings,
-                                            'DJANGO_PREMAILER_DEFAULT_CACHE_BACKEND_NAME',
-                                            defaults.DJANGO_PREMAILER_DEFAULT_CACHE_BACKEND_NAME)
+DJANGO_PREMAILER_DEFAULT_CACHE_BACKEND_NAME = getattr(
+    settings,
+    'DJANGO_PREMAILER_DEFAULT_CACHE_BACKEND_NAME',
+    defaults.DJANGO_PREMAILER_DEFAULT_CACHE_BACKEND_NAME
+)
 
-FILTER_PSEUDOSELECTORS = [':last-child', ':first-child', 'nth-child']
-element_selector_regex = re.compile(r'(^|\s)\w')
+# These pseudo selectors are ok to inline as they just filter the elements matched,
+# as apposed to things like :hover or :focus which can't be inlined.
+FILTER_PSEUDO_SELECTORS = [':last-child', ':first-child', ':nth-child']
+
+# Regular expression to find number of different elements being targeted by a selector
+ELEMENT_SELECTOR_REGEX = re.compile(r'(^|\s)\w')
+
+# Regular expression to find all pseudo selectors in a selector
+PSEUDO_SELECTOR_REGEX = re.compile(r':[a-z\-]+')
 
 
 def load_cache(cache_name):
@@ -186,8 +195,8 @@ class CSSParser(object):
                 if x.strip() and not x.strip().startswith('@')
             )
             for selector in selectors:
-                if (':' in selector
-                   and ':' + selector.split(':', 1)[1] not in FILTER_PSEUDOSELECTORS):
+                pseudos = [x.group(0) for x in PSEUDO_SELECTOR_REGEX.finditer(selector)]
+                if any(pseudo not in FILTER_PSEUDO_SELECTORS for pseudo in pseudos):
                     leftover.append((selector, bulk))
                     continue
                 elif '*' in selector and not self.include_star_selectors:
@@ -196,7 +205,7 @@ class CSSParser(object):
                 # Crudely calculate specificity
                 id_count = selector.count('#')
                 class_count = selector.count('.')
-                element_count = len(element_selector_regex.findall(selector))
+                element_count = len(ELEMENT_SELECTOR_REGEX.findall(selector))
 
                 specificity = (id_count, class_count, element_count, ruleset_index, rule_index)
 
