@@ -97,7 +97,11 @@ class CSSLoader(object):
             contents = self._get_file_contents_from_url(filepath)
         else:
             contents = self._get_file_contents_from_local_file(filepath)
-        self.cache.set(self._get_cache_key(filepath), contents, self.DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_TTL)
+
+        self.cache.set(self._get_cache_key(filepath),
+                       contents,
+                       self.DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_TTL)
+
         return contents
 
     def __iter__(self):
@@ -109,20 +113,26 @@ class CSSParser(object):
     """Class responsible for parsing CSS
     """
 
-    DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_PREFIX = getattr(settings,
-                                         'DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_PREFIX',
-                                         defaults.DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_PREFIX)
-    DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_TTL = getattr(settings,
-                                      'DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_TTL',
-                                      defaults.DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_TTL)
-    DJANGO_PREMAILER_CSS_HTML_ATTRIBUTE_MAPPING = getattr(settings,
-                                         'DJANGO_PREMAILER_CSS_HTML_ATTRIBUTE_MAPPING',
-                                         defaults.DJANGO_PREMAILER_CSS_HTML_ATTRIBUTE_MAPPING)
+    DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_PREFIX = getattr(
+        settings,
+        'DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_PREFIX',
+        defaults.DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_PREFIX
+    )
+
+    DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_TTL = getattr(
+        settings,
+        'DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_TTL',
+        defaults.DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_TTL
+    )
+
+    DJANGO_PREMAILER_CSS_HTML_ATTRIBUTE_MAPPING = getattr(
+        settings,
+        'DJANGO_PREMAILER_CSS_HTML_ATTRIBUTE_MAPPING',
+        defaults.DJANGO_PREMAILER_CSS_HTML_ATTRIBUTE_MAPPING
+    )
 
     def __init__(self, cache_backend=None, **kwargs):
         self.cache = load_cache(cache_backend)
-        self.enable_validation = kwargs.get('enable_validation', False)
-        self.exclude_pseudoclasses = kwargs.get('exclude_pseudoclasses', True)
         self.include_star_selectors = kwargs.get('include_star_selectors', False)
 
     def _get_cache_key(self, css_body, index):
@@ -155,10 +165,10 @@ class CSSParser(object):
         if not css_body:
             return rules, leftover
 
-        sheet = cssutils.parseString(css_body, validate=self.enable_validation)
+        sheet = cssutils.parseString(css_body, validate=False)
         for rule in sheet:
-            # handle media rule
-            if rule.type == rule.MEDIA_RULE:
+            # handle media and font rules
+            if rule.type in (rule.MEDIA_RULE, rule.FONT_FACE_RULE):
                 leftover.append(rule)
                 continue
 
@@ -176,9 +186,8 @@ class CSSParser(object):
                 if x.strip() and not x.strip().startswith('@')
             )
             for selector in selectors:
-                if (':' in selector and self.exclude_pseudoclasses
-                        and ':' + selector.split(':', 1)[1] not in FILTER_PSEUDOSELECTORS):
-                    # a pseudoclass
+                if (':' in selector
+                   and ':' + selector.split(':', 1)[1] not in FILTER_PSEUDOSELECTORS):
                     leftover.append((selector, bulk))
                     continue
                 elif '*' in selector and not self.include_star_selectors:
@@ -194,15 +203,17 @@ class CSSParser(object):
                 rules.append((specificity, selector, bulk))
                 rule_index += 1
 
-        # we want to return a string, not those crazy CSSRule objects. This will make serialization
-        # much faster
+        # we want to return a string, not those crazy CSSRule objects.
+        # This will make serialization much faster
         leftover = self._css_rules_to_string(leftover)
 
         return rules, leftover
 
     def _make_important(self, bulk):
-        """Marks every property in a string as `!important`
         """
+        Marks every property in a string as `!important`
+        """
+
         return ';'.join('%s !important' % p if not p.endswith('!important') else p for p in
                         bulk.split(';'))
 
@@ -221,8 +232,9 @@ class CSSParser(object):
             if isinstance(item, tuple):
                 k, v = item
                 lines.append('%s {%s}' % (k, self._make_important(v)))
-            # media rule
-            else:
+            elif item.type == item.FONT_FACE_RULE:
+                lines.append(item.cssText)
+            elif item.type == item.MEDIA_RULE:
                 for rule in item.cssRules:
                     if isinstance(rule, cssutils.css.csscomment.CSSComment):
                         continue
@@ -301,7 +313,7 @@ class CSSParser(object):
             d[chunks[0].strip()] = chunks[1].strip()
         return d
 
-    def css_style_to_basic_html_attributes(self, element, style_content, disable_basic_attributes):
+    def css_style_to_basic_html_attributes(self, element, style_content):
         """Given an element and styles like 'background-color:red; font-family:Arial' turn some of
         that into HTML attributes
 
@@ -311,16 +323,15 @@ class CSSParser(object):
         if style_content.count('}') and style_content.count('{') == style_content.count('}'):
             style_content = style_content.split('}')[0][1:]
 
+        mappings = self.DJANGO_PREMAILER_CSS_HTML_ATTRIBUTE_MAPPING
+
         for key, value in [
             x.split(':')
             for x in style_content.split(';') if len(x.split(':')) == 2
         ]:
             try:
-                new_key, new_value = self.DJANGO_PREMAILER_CSS_HTML_ATTRIBUTE_MAPPING.get(key.strip(), None)
+                new_key, new_value = mappings.get(key.strip())
             except TypeError:
                 continue
             else:
-                if new_key in disable_basic_attributes:
-                    # already set, don't dare to overwrite
-                    continue
                 element.attrib[new_key] = new_value(value)

@@ -7,3 +7,5 @@ django-premailer.egg-info
 .DS_Store
 .coverage
 .tox
+.idea
+django_premailer.egg-info

@@ -1,4 +1,20 @@
-h1, h2 { color:red; }
+h1, h2 {
+    color:red;
+}
+
 strong {
-    text-decoration:none
+    text-decoration: none;
+}
+
+@media all and (max-width: 500px) {
+    [class~="text"] {
+        color: blue;
+    }
+}
+
+@font-face {
+    font-family: 'Garamond';
+    src: local('Garamond'), local('Garamond-Regular'), url('Garamond.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
 }
