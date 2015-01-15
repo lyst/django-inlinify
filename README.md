@@ -1,13 +1,13 @@
-django-premailer
+django-inlinify
 =========
 
-This is just a personalized version of premailer, which is ~10x faster. Read the docs in https://github.com/peterbe/premailer for more info
+Django app for in-lining CSS. This project was initially based on [premailer](https://github.com/peterbe/premailer).
 
 Usage
 --------------
-Just include `django_premailer` in your `INSTALLED_APPS` and
+Just include `django_inlinify` in your `INSTALLED_APPS` and
 ```python
-from django_premailer.premailer import Premailer
+from django_inlinify.inlinify import Inlinify
 
 html = '<html>
         <head>
@@ -23,40 +23,43 @@ html = '<html>
         </body>
         </html>'
 
-p = Premailer()
+p = Inlinify()
 p.transform(html)
 ```
 
 Settings
 --------------
 
-Override the following in your Django settings according to your needs. You can check their default values on `django_premailer/defaults.py`
+Override the following in your Django settings according to your needs. You can check their default values on `django_inlinify/defaults.py`
 
 ```python
 # the default cache backend. Make sure it exists in `CACHES`
-DJANGO_PREMAILER_DEFAULT_CACHE_BACKEND_NAME
+DJANGO_INLINIFY_DEFAULT_CACHE_BACKEND_NAME
 
 # CSS parser cache key prefix
-DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_PREFIX
+DJANGO_INLINIFY_CSSPARSER_CACHE_KEY_PREFIX
+
 # CSS parser cache key TTL
-DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_TTL
+DJANGO_INLINIFY_CSSPARSER_CACHE_KEY_TTL
+
 # CSS attribute to HTML attribute mapping
-DJANGO_PREMAILER_CSS_HTML_ATTRIBUTE_MAPPING
+DJANGO_INLINIFY_CSS_HTML_ATTRIBUTE_MAPPING
 
 # CSS loader cache key prefix
-DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_PREFIX
+DJANGO_INLINIFY_CSSLOADER_CACHE_KEY_PREFIX
+
 # CSS loader cache key TTL
-DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_TTL
+DJANGO_INLINIFY_CSSLOADER_CACHE_KEY_TTL
 ```
 
 Running tests
 ----
 
 ```python
-DJANGO_SETTINGS_MODULE="django_premailer.test_settings" python setup.py test
+DJANGO_SETTINGS_MODULE="django_inlinify.test_settings" python setup.py test
 ```
 
 Version
 ----
 
-0.0.11
+0.0.13

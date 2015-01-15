@@ -3,9 +3,9 @@
 dist
 build/
 *.egg
-django-premailer.egg-info
+django-inlinify.egg-info
 .DS_Store
 .coverage
 .tox
 .idea
-django_premailer.egg-info
+django_inlinify.egg-info

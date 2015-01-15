@@ -1,41 +1,19 @@
-# Prevent spurious errors during `python setup.py test`, a la
-# http://www.eby-sarna.com/pipermail/peak/2010-May/003357.html:
-try:
-    import multiprocessing
-except ImportError:
-    pass
-
 from setuptools import setup, find_packages
 
 setup(
-    name='django-premailer',
+    name='django-inlinify',
     version='0.0.13',
-    description="Turns CSS blocks into style attributes",
-    long_description="Turns CSS blocks into style attributes",
+    description="In-lines CSS into HTML and leverages Django's caching framework.",
+    long_description="In-lines CSS into HTML and leverages Django's caching framework.",
     keywords='html lxml email mail style',
     author='Lyst Ltd.',
     author_email='devs@lyst.com',
-    url='http://github.com/ssaw/',
+    url='http://github.com/ssaw/django-inlinify/',
     license='Python',
     classifiers=[
         "Development Status :: 5 - Production/Stable",
-        "Environment :: Other Environment",
-        "Environment :: Web Environment",
-        "Intended Audience :: Developers",
-        "License :: OSI Approved :: Python Software Foundation License",
-        "Operating System :: OS Independent",
+        "License :: OSI Approved :: Apache Software License",
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
-        "Programming Language :: Python :: 2.6",
-        "Programming Language :: Python :: 2.7",
-        "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.3",
-        "Programming Language :: Python :: 3.4",
-        "Programming Language :: Python :: Implementation :: CPython",
-        "Programming Language :: Python :: Implementation :: PyPy",
-        "Topic :: Communications",
-        "Topic :: Internet :: WWW/HTTP",
-        "Topic :: Other/Nonlisted Topic",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     packages=find_packages(),
