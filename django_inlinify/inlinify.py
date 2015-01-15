@@ -11,12 +11,12 @@ else:  # Python 2
 
 from lxml import etree
 from lxml.cssselect import CSSSelector
-from django_premailer.css_tools import CSSLoader, CSSParser
+from django_inlinify.css_tools import CSSLoader, CSSParser
 
-__all__ = ['Premailer']
+__all__ = ['Inlinify']
 
 
-class Premailer(object):
+class Inlinify(object):
 
     def __init__(self,
                  css_files=None,

@@ -4,17 +4,17 @@ import requests
 import cssutils
 from django.core.cache import get_cache, InvalidCacheBackendError
 from django.conf import settings
-from django_premailer import defaults
+from django_inlinify import defaults
 from StringIO import StringIO
 from contextlib import closing
 from hashlib import md5
 
-log = logging.getLogger('django_premailer.css_loader')
+log = logging.getLogger('django_inlinify.css_loader')
 
-DJANGO_PREMAILER_DEFAULT_CACHE_BACKEND_NAME = getattr(
+DJANGO_INLINIFY_DEFAULT_CACHE_BACKEND_NAME = getattr(
     settings,
-    'DJANGO_PREMAILER_DEFAULT_CACHE_BACKEND_NAME',
-    defaults.DJANGO_PREMAILER_DEFAULT_CACHE_BACKEND_NAME
+    'DJANGO_INLINIFY_DEFAULT_CACHE_BACKEND_NAME',
+    defaults.DJANGO_INLINIFY_DEFAULT_CACHE_BACKEND_NAME
 )
 
 # These pseudo selectors are ok to inline as they just filter the elements matched,
@@ -39,13 +39,13 @@ def load_cache(cache_name):
         cache object
     """
     if not cache_name:
-        return get_cache(DJANGO_PREMAILER_DEFAULT_CACHE_BACKEND_NAME)
+        return get_cache(DJANGO_INLINIFY_DEFAULT_CACHE_BACKEND_NAME)
     try:
         cache = get_cache(cache_name)
     except InvalidCacheBackendError:
         log.error('The cache you specified (%s) is not defined in settings. Falling back to '
-                  'the default one (%s)', cache_name, DJANGO_PREMAILER_DEFAULT_CACHE_BACKEND_NAME)
-        cache = get_cache(DJANGO_PREMAILER_DEFAULT_CACHE_BACKEND_NAME)
+                  'the default one (%s)', cache_name, DJANGO_INLINIFY_DEFAULT_CACHE_BACKEND_NAME)
+        cache = get_cache(DJANGO_INLINIFY_DEFAULT_CACHE_BACKEND_NAME)
     return cache
 
 
@@ -53,19 +53,19 @@ class CSSLoader(object):
     """Class responsible for loading CSS files. Supports local and remote files
     """
 
-    DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_PREFIX = getattr(settings,
-                                         'DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_PREFIX',
-                                         defaults.DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_PREFIX)
-    DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_TTL = getattr(settings,
-                                      'DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_TTL',
-                                      defaults.DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_TTL)
+    DJANGO_INLINIFY_CSSLOADER_CACHE_KEY_PREFIX = getattr(settings,
+                                         'DJANGO_INLINIFY_CSSLOADER_CACHE_KEY_PREFIX',
+                                         defaults.DJANGO_INLINIFY_CSSLOADER_CACHE_KEY_PREFIX)
+    DJANGO_INLINIFY_CSSLOADER_CACHE_KEY_TTL = getattr(settings,
+                                      'DJANGO_INLINIFY_CSSLOADER_CACHE_KEY_TTL',
+                                      defaults.DJANGO_INLINIFY_CSSLOADER_CACHE_KEY_TTL)
 
     def __init__(self, files, cache_backend=None):
         self.files = files if files else []
         self.cache = load_cache(cache_backend)
 
     def _get_cache_key(self, filepath):
-        return '%s_filecontents_%s_' % (self.DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_PREFIX, filepath)
+        return '%s_filecontents_%s_' % (self.DJANGO_INLINIFY_CSSLOADER_CACHE_KEY_PREFIX, filepath)
 
     def _get_cached_contents(self, filename):
         return self.cache.get(self._get_cache_key(filename))
@@ -109,7 +109,7 @@ class CSSLoader(object):
 
         self.cache.set(self._get_cache_key(filepath),
                        contents,
-                       self.DJANGO_PREMAILER_CSSLOADER_CACHE_KEY_TTL)
+                       self.DJANGO_INLINIFY_CSSLOADER_CACHE_KEY_TTL)
 
         return contents
 
@@ -122,22 +122,22 @@ class CSSParser(object):
     """Class responsible for parsing CSS
     """
 
-    DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_PREFIX = getattr(
+    DJANGO_INLINIFY_CSSPARSER_CACHE_KEY_PREFIX = getattr(
         settings,
-        'DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_PREFIX',
-        defaults.DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_PREFIX
+        'DJANGO_INLINIFY_CSSPARSER_CACHE_KEY_PREFIX',
+        defaults.DJANGO_INLINIFY_CSSPARSER_CACHE_KEY_PREFIX
     )
 
-    DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_TTL = getattr(
+    DJANGO_INLINIFY_CSSPARSER_CACHE_KEY_TTL = getattr(
         settings,
-        'DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_TTL',
-        defaults.DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_TTL
+        'DJANGO_INLINIFY_CSSPARSER_CACHE_KEY_TTL',
+        defaults.DJANGO_INLINIFY_CSSPARSER_CACHE_KEY_TTL
     )
 
-    DJANGO_PREMAILER_CSS_HTML_ATTRIBUTE_MAPPING = getattr(
+    DJANGO_INLINIFY_CSS_HTML_ATTRIBUTE_MAPPING = getattr(
         settings,
-        'DJANGO_PREMAILER_CSS_HTML_ATTRIBUTE_MAPPING',
-        defaults.DJANGO_PREMAILER_CSS_HTML_ATTRIBUTE_MAPPING
+        'DJANGO_INLINIFY_CSS_HTML_ATTRIBUTE_MAPPING',
+        defaults.DJANGO_INLINIFY_CSS_HTML_ATTRIBUTE_MAPPING
     )
 
     def __init__(self, cache_backend=None, **kwargs):
@@ -146,7 +146,7 @@ class CSSParser(object):
 
     def _get_cache_key(self, css_body, index):
         h = md5(str(css_body)).hexdigest()
-        return '%s_contents_%s_%s' % (self.DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_PREFIX, h, index)
+        return '%s_contents_%s_%s' % (self.DJANGO_INLINIFY_CSSPARSER_CACHE_KEY_PREFIX, h, index)
 
     def _get_cached_css(self, css_body, index):
         return self.cache.get(self._get_cache_key(css_body, index))
@@ -160,7 +160,7 @@ class CSSParser(object):
             return cached
         parsed = self._parse_style_rules(css_body, ruleset_index)
         self.cache.set(self._get_cache_key(css_body, ruleset_index), parsed,
-                       self.DJANGO_PREMAILER_CSSPARSER_CACHE_KEY_TTL)
+                       self.DJANGO_INLINIFY_CSSPARSER_CACHE_KEY_TTL)
         return parsed
 
     def _parse_style_rules(self, css_body, ruleset_index):
@@ -332,7 +332,7 @@ class CSSParser(object):
         if style_content.count('}') and style_content.count('{') == style_content.count('}'):
             style_content = style_content.split('}')[0][1:]
 
-        mappings = self.DJANGO_PREMAILER_CSS_HTML_ATTRIBUTE_MAPPING
+        mappings = self.DJANGO_INLINIFY_CSS_HTML_ATTRIBUTE_MAPPING
 
         for key, value in [
             x.split(':')

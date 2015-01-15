@@ -7,8 +7,8 @@ import unittest
 
 from nose.tools import eq_, ok_
 
-from django_premailer.premailer import Premailer
-from django_premailer.css_tools import CSSParser
+from django_inlinify.inlinify import Inlinify
+from django_inlinify.css_tools import CSSParser
 
 whitespace_between_tags = re.compile('>\s*<')
 
@@ -81,7 +81,7 @@ class Tests(unittest.TestCase):
 
         html = read_html_file('test_basic_html_input.html')
         expected_output = read_html_file('test_basic_html_expected.html')
-        compare_html(expected_output, Premailer().transform(html))
+        compare_html(expected_output, Inlinify().transform(html))
 
     def test_empty_style_tag(self):
         """
@@ -90,7 +90,7 @@ class Tests(unittest.TestCase):
 
         html = read_html_file('test_empty_style_tag_input.html')
         expected_output = read_html_file('test_empty_style_tag_expected.html')
-        compare_html(expected_output, Premailer().transform(html))
+        compare_html(expected_output, Inlinify().transform(html))
 
     def test_include_star_selector(self):
         """
@@ -100,8 +100,8 @@ class Tests(unittest.TestCase):
         html = read_html_file('test_include_star_selector_input.html')
         expected_output = read_html_file('test_include_star_selector_expected.html')
 
-        compare_html(html, Premailer().transform(html))
-        compare_html(expected_output, Premailer(include_star_selectors=True).transform(html))
+        compare_html(html, Inlinify().transform(html))
+        compare_html(expected_output, Inlinify(include_star_selectors=True).transform(html))
 
     def test_pseudo_selectors_are_not_inlined(self):
         """
@@ -110,14 +110,14 @@ class Tests(unittest.TestCase):
 
         html = read_html_file('test_pseudo_selectors_are_not_inlined_input.html')
         expected_output = read_html_file('test_pseudo_selectors_are_not_inlined_expected.html')
-        compare_html(expected_output, Premailer().transform(html))
+        compare_html(expected_output, Inlinify().transform(html))
 
     def test_parse_style_rules(self):
         """
         CSS should be parsed correctly.
         """
 
-        p = Premailer()  # won't need the html
+        p = Inlinify()  # won't need the html
         func = p.css_parser.parse
         rules, leftover = func(read_css_file('test_parse_style_rules.css'), 0)
 
@@ -145,7 +145,7 @@ class Tests(unittest.TestCase):
         The correct specificity should be determined for a selector.
         """
 
-        p = Premailer()
+        p = Inlinify()
         rules, leftover = p.css_parser.parse(read_css_file('test_precedence_comparison.css'), 0)
 
         # 'rules' is a list, turn it into a dict for easier assertion testing
@@ -177,7 +177,7 @@ class Tests(unittest.TestCase):
         html = read_html_file('test_base_url_option_input.html')
         expected_output = read_html_file('test_base_url_option_expected.html')
 
-        p = Premailer(
+        p = Inlinify(
             base_url='http://kungfupeople.com',
             preserve_internal_links=True
         )
@@ -191,7 +191,7 @@ class Tests(unittest.TestCase):
 
         html = read_html_file('test_style_block_with_external_urls_input.html')
         expected_output = read_html_file('test_style_block_with_external_urls_expected.html')
-        result_html = Premailer().transform(html)
+        result_html = Inlinify().transform(html)
         compare_html(expected_output, result_html)
 
     def test_css_with_html_attributes(self):
@@ -201,7 +201,7 @@ class Tests(unittest.TestCase):
 
         html = read_html_file('test_style_block_with_external_urls_input.html')
         expected_output = read_html_file('test_style_block_with_external_urls_expected.html')
-        result_html = Premailer().transform(html)
+        result_html = Inlinify().transform(html)
         compare_html(expected_output, result_html)
 
     def test_mailto_url(self):
@@ -210,7 +210,7 @@ class Tests(unittest.TestCase):
         """
 
         html = read_html_file('test_mailto_url.html')
-        p = Premailer(base_url='http://kungfupeople.com')
+        p = Inlinify(base_url='http://kungfupeople.com')
         compare_html(html, p.transform(html))
 
     def test_last_child(self):
@@ -220,7 +220,7 @@ class Tests(unittest.TestCase):
 
         html = read_html_file('test_last_child_input.html')
         expected_output = read_html_file('test_last_child_expected.html')
-        compare_html(expected_output, Premailer().transform(html))
+        compare_html(expected_output, Inlinify().transform(html))
 
     def test_nth_child(self):
         """
@@ -230,7 +230,7 @@ class Tests(unittest.TestCase):
         html = read_html_file('test_nth_child_input.html')
         expected_output = read_html_file('test_nth_child_expected.html')
         compare_html(expected_output,
-                     Premailer(css_files=[css_path('test_nth_child.css')]).transform(html))
+                     Inlinify(css_files=[css_path('test_nth_child.css')]).transform(html))
 
     def test_child_selector(self):
         """
@@ -239,7 +239,7 @@ class Tests(unittest.TestCase):
 
         html = read_html_file('test_child_selector_input.html')
         expected_output = read_html_file('test_child_selector_expected.html')
-        compare_html(expected_output, Premailer().transform(html))
+        compare_html(expected_output, Inlinify().transform(html))
 
     def test_doctype(self):
         """
@@ -247,7 +247,7 @@ class Tests(unittest.TestCase):
         """
 
         html = read_html_file('test_doctype.html')
-        compare_html(html, Premailer().transform(html))
+        compare_html(html, Inlinify().transform(html))
 
     def test_multiple_style_elements(self):
         """
@@ -256,7 +256,7 @@ class Tests(unittest.TestCase):
 
         html = read_html_file('test_multiple_style_elements_input.html')
         expected_output = read_html_file('test_multiple_style_elements_expected.html')
-        compare_html(expected_output, Premailer().transform(html))
+        compare_html(expected_output, Inlinify().transform(html))
 
     def test_parsing_from_css_local_file(self):
         """
@@ -266,7 +266,7 @@ class Tests(unittest.TestCase):
         html = read_html_file('test_parsing_from_css_local_file_input.html')
         expected_output = read_html_file('test_parsing_from_css_local_file_expected.html')
 
-        p = Premailer(css_files=[css_path('test_parsing_from_css_local_file.css')])
+        p = Inlinify(css_files=[css_path('test_parsing_from_css_local_file.css')])
         result_html = p.transform(html)
         compare_html(expected_output, result_html)
 
@@ -277,4 +277,4 @@ class Tests(unittest.TestCase):
 
         html = read_html_file('test_style_attribute_specificity_input.html')
         expected_output = read_html_file('test_style_attribute_specificity_expected.html')
-        compare_html(expected_output, Premailer().transform(html))
+        compare_html(expected_output, Inlinify().transform(html))
