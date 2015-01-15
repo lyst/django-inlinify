@@ -1,0 +1,11 @@
+div:nth-child(odd) {
+    color: red;
+}
+
+div:nth-child(even) {
+    color: blue;
+}
+
+div:nth-child(3n) {
+    font-weight: bold;
+}
