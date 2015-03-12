@@ -9,3 +9,7 @@ django-inlinify.egg-info
 .tox
 .idea
 django_inlinify.egg-info
+.Python
+bin/
+include/
+lib/
