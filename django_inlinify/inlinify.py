@@ -37,16 +37,13 @@ class Inlinify(object):
     def transform(self, html, pretty_print=True, **kwargs):
         """Transform CSS into inline styles and inject them in the provided html
         """
-        parser = etree.HTMLParser()
         stripped = html.strip()
-        tree = etree.fromstring(stripped, parser).getroottree()
+        tree = etree.fromstring(stripped).getroottree()
         page = tree.getroot()
 
         # lxml inserts a doctype if none exists, so only include it in the root if it was in
         # the original html
         root = tree if stripped.startswith(tree.docinfo.doctype) else page
-
-        assert page is not None
 
         # process style block
         rules = self._process_style_block(page)
