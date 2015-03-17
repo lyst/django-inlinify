@@ -245,7 +245,6 @@ class Tests(unittest.TestCase):
         """
         If the HTML contains a doctype it should not be removed.
         """
-
         html = read_html_file('test_doctype.html')
         compare_html(html, Inlinify().transform(html))
 
@@ -278,3 +277,15 @@ class Tests(unittest.TestCase):
         html = read_html_file('test_style_attribute_specificity_input.html')
         expected_output = read_html_file('test_style_attribute_specificity_expected.html')
         compare_html(expected_output, Inlinify().transform(html))
+
+    def test_xml(self):
+        """
+        Styles already present in an elements 'style' tag should win over all else.
+        """
+        html = read_html_file('test_xml.html')
+        expected_output = read_html_file('test_xml_expected.html')
+        css_style_path = css_path('test_xml.css')
+        print Inlinify(method='xml',
+                                               css_files=[css_style_path]).transform(html)
+        compare_html(expected_output, Inlinify(method='xml',
+                                               css_files=[css_style_path]).transform(html))
