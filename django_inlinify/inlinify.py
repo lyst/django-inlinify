@@ -60,6 +60,13 @@ class Inlinify(object):
 
         original_styles = {}
         for __, selector, new_style in rules:
+
+            # this check will avoid having to create a CSSSelector to then discover than there
+            # is not any matching element in the document. Each selector can take up to 1.5ms, so
+            # this is a huge time saver
+            if selector not in stripped:
+                continue
+
             sel = CSSSelector(selector)
             for item in sel(page):
                 current_style = item.attrib.get('style', '')
@@ -83,6 +90,7 @@ class Inlinify(object):
         """Processes the provided external CSS files, if any
         """
         rules = []
+        head = CSSSelector('head')(page)
         for index, css_body in enumerate(self.css_source):
             these_rules, these_leftover = self.css_parser.parse(css_body, index)
             rules.extend(these_rules)
@@ -90,7 +98,6 @@ class Inlinify(object):
                 style = etree.Element('style')
                 style.attrib['type'] = 'text/css'
                 style.text = these_leftover
-                head = CSSSelector('head')(page)
                 if head:
                     head[0].append(style)
         return rules
