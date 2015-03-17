@@ -1,5 +1,6 @@
 from __future__ import absolute_import, unicode_literals
 import operator
+import re
 import sys
 if sys.version_info >= (3, ):  # pragma: no cover
     # As in, Python 3
@@ -16,6 +17,10 @@ from django_inlinify.css_tools import CSSLoader, CSSParser
 __all__ = ['Inlinify']
 
 
+SINGLE_SELECTOR_REGEX = re.compile('^[\w\-.#]+$')
+CDATA_REGEX = re.compile(r'<!\[CDATA\[(.*?)\]\]\>', re.DOTALL)
+
+
 class Inlinify(object):
 
     def __init__(self,
@@ -23,12 +28,17 @@ class Inlinify(object):
                  base_url=None,
                  preserve_internal_links=False,
                  preserve_inline_attachments=True,
+                 method='html',
                  **kwargs):
 
         # attributes required by the URL parser
         self.base_url = base_url
         self.preserve_internal_links = preserve_internal_links
         self.preserve_inline_attachments = preserve_inline_attachments
+        self.method = method
+
+        if self.method not in ('html', 'xml'):
+            raise ValueError('{} is not supported as a method'.format(method))
 
         # initialize parser and loader
         self.css_parser = CSSParser(**kwargs)
@@ -37,7 +47,12 @@ class Inlinify(object):
     def transform(self, html, pretty_print=True, **kwargs):
         """Transform CSS into inline styles and inject them in the provided html
         """
-        parser = etree.HTMLParser()
+        parser = None
+        if self.method == 'html':
+            parser = etree.HTMLParser()
+        elif self.method == 'xml':
+            parser = etree.XMLParser(ns_clean=False, resolve_entities=False)
+
         stripped = html.strip()
         tree = etree.fromstring(stripped, parser).getroottree()
         page = tree.getroot()
@@ -60,6 +75,13 @@ class Inlinify(object):
 
         original_styles = {}
         for __, selector, new_style in rules:
+
+            # this check will avoid having to create a CSSSelector to then discover than there
+            # is not any matching element in the document. Each selector can take up to 1.5ms, so
+            # this is a huge time saver
+            if SINGLE_SELECTOR_REGEX.match(selector) and selector not in stripped:
+                continue
+
             sel = CSSSelector(selector)
             for item in sel(page):
                 current_style = item.attrib.get('style', '')
@@ -74,23 +96,33 @@ class Inlinify(object):
         self._transform_urls(page)
 
         # set some default options
-        kwargs.setdefault('method', 'html')
+        kwargs.setdefault('method', self.method)
         kwargs.setdefault('pretty_print', pretty_print)
         kwargs.setdefault('encoding', 'utf-8')
-        return etree.tostring(root, **kwargs).decode(kwargs['encoding'])
+
+        html = etree.tostring(root, **kwargs).decode(kwargs['encoding'])
+
+        # need to replace the "<![CDATA" style comments with "/*<![CDATA" comments to be valid XHTML
+        if self.method == 'xml':
+            html = CDATA_REGEX.sub(lambda m: '/*<![CDATA[*/%s/*]]>*/' % m.group(1), html)
+
+        return html
 
     def _process_external_files(self, page):
         """Processes the provided external CSS files, if any
         """
         rules = []
+        head = CSSSelector('head')(page)
         for index, css_body in enumerate(self.css_source):
             these_rules, these_leftover = self.css_parser.parse(css_body, index)
             rules.extend(these_rules)
             if these_leftover:
                 style = etree.Element('style')
                 style.attrib['type'] = 'text/css'
-                style.text = these_leftover
-                head = CSSSelector('head')(page)
+                if self.method == 'html':
+                    style.text = these_leftover
+                elif self.method == 'xml':
+                    style.text = etree.CDATA(these_leftover)
                 if head:
                     head[0].append(style)
         return rules
