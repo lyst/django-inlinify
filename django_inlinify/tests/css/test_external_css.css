@@ -1,0 +1,18 @@
+.outer {
+    color: red;
+}
+.inner {
+    color: blue;
+}
+.outer .inner {
+    font-size: 12px;
+}
+div.inner {
+    margin-top: 10px;
+}
+.doesnt-exist {
+    color: yellow;
+}
+.also-doesnt-exist {
+    color: hotpink;;
+}

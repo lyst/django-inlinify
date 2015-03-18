@@ -17,7 +17,7 @@ from django_inlinify.css_tools import CSSLoader, CSSParser
 __all__ = ['Inlinify']
 
 
-SINGLE_SELECTOR_REGEX = re.compile('^[\w\-.#]+$')
+FIRST_SELECTOR_PART_REGEX = re.compile('^(\.|#|)([\w\-]+)')
 CDATA_REGEX = re.compile(r'<!\[CDATA\[(.*?)\]\]\>', re.DOTALL)
 
 
@@ -76,10 +76,17 @@ class Inlinify(object):
         original_styles = {}
         for __, selector, new_style in rules:
 
-            # this check will avoid having to create a CSSSelector to then discover than there
-            # is not any matching element in the document. Each selector can take up to 1.5ms, so
-            # this is a huge time saver
-            if SINGLE_SELECTOR_REGEX.match(selector) and selector not in stripped:
+            # Constructing a CSSSelector instance and querying the page can be quite slow we
+            # first do this simple check to exclude selectors that are not present in the HTML.
+            # For example:
+            #     If the selector was ".foo .bar" we search for "foo" in the hmtl
+            #     If the selector was ".foo.bar" we search for "foo" in the html
+            #     If the selector was "div.large" we search for "div" in the html
+            # This will obviously give false positives, but that is ok as it still gives a big
+            # speed boost in cases where there are a lot of selectors that are not present
+            # in the HTML.
+            match = FIRST_SELECTOR_PART_REGEX.match(selector)
+            if match and match.group(2) not in stripped:
                 continue
 
             sel = CSSSelector(selector)
