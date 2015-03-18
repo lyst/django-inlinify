@@ -285,7 +285,14 @@ class Tests(unittest.TestCase):
         html = read_html_file('test_xml.html')
         expected_output = read_html_file('test_xml_expected.html')
         css_style_path = css_path('test_xml.css')
-        print Inlinify(method='xml',
-                                               css_files=[css_style_path]).transform(html)
         compare_html(expected_output, Inlinify(method='xml',
                                                css_files=[css_style_path]).transform(html))
+
+    def test_external_css(self):
+        """
+        Styles already present in an elements 'style' tag should win over all else.
+        """
+        html = read_html_file('test_external_css_input.html')
+        expected_output = read_html_file('test_external_css_expected.html')
+        css_style_path = css_path('test_external_css.css')
+        compare_html(expected_output, Inlinify(css_files=[css_style_path]).transform(html))
