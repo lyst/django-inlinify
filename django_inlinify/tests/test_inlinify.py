@@ -1,11 +1,11 @@
 from __future__ import absolute_import, unicode_literals
+
+from contextlib import contextmanager
 import os
 from os.path import dirname, abspath
 from os.path import join as joinpath
 import re
 import unittest
-
-from nose.tools import eq_, ok_
 
 from django_inlinify.inlinify import Inlinify
 from django_inlinify.css_tools import CSSParser
@@ -23,7 +23,7 @@ def compare_html(one, two):
     for i, line in enumerate(one.splitlines()):
         other = two.splitlines()[i]
         if line.lstrip() != other.lstrip():
-            eq_(line.lstrip(), other.lstrip())
+            assert line.lstrip() == other.lstrip()
 
 ROOT = abspath(joinpath(dirname(__file__)))
 
@@ -36,12 +36,18 @@ def css_path(filename):
     return os.path.join(ROOT, 'css', filename)
 
 
+@contextmanager
 def read_html_file(filename):
-    return open(html_path(filename)).read()
+    file = open(html_path(filename))
+    yield file.read()
+    file.close()
 
 
+@contextmanager
 def read_css_file(filename):
-    return open(css_path(filename)).read()
+    file = open(css_path(filename))
+    yield file.read()
+    file.close()
 
 
 class Tests(unittest.TestCase):
@@ -56,7 +62,7 @@ class Tests(unittest.TestCase):
         parser = CSSParser()
         result = parser.merge_styles(old, new)
         for each in expect:
-            ok_(each in result)
+            assert each in result
 
     def test_merge_styles_non_trivial(self):
         """
@@ -72,54 +78,53 @@ class Tests(unittest.TestCase):
         parser = CSSParser()
         result = parser.merge_styles(old, new)
         for each in expect:
-            ok_(each in result)
+            assert each in result
 
     def test_basic_html(self):
         """
         CSS defined in the <head> should be in-lined where possible.
         """
 
-        html = read_html_file('test_basic_html_input.html')
-        expected_output = read_html_file('test_basic_html_expected.html')
-        compare_html(expected_output, Inlinify().transform(html))
+        with read_html_file('test_basic_html_input.html') as html:
+            with read_html_file('test_basic_html_expected.html') as expected_output:
+                compare_html(expected_output, Inlinify().transform(html))
 
     def test_empty_style_tag(self):
         """
         An empty <style> tag in the <head> should be ignored.
         """
 
-        html = read_html_file('test_empty_style_tag_input.html')
-        expected_output = read_html_file('test_empty_style_tag_expected.html')
-        compare_html(expected_output, Inlinify().transform(html))
+        with read_html_file('test_empty_style_tag_input.html') as html:
+            with read_html_file('test_empty_style_tag_expected.html') as expected_output:
+                compare_html(expected_output, Inlinify().transform(html))
 
     def test_include_star_selector(self):
         """
         '*' selectors should work if the include_star_selectors option is True
         """
 
-        html = read_html_file('test_include_star_selector_input.html')
-        expected_output = read_html_file('test_include_star_selector_expected.html')
-
-        compare_html(html, Inlinify().transform(html))
-        compare_html(expected_output, Inlinify(include_star_selectors=True).transform(html))
+        with read_html_file('test_include_star_selector_input.html') as html:
+            with read_html_file('test_include_star_selector_expected.html') as expected_output:
+                compare_html(html, Inlinify().transform(html))
+                compare_html(expected_output, Inlinify(include_star_selectors=True).transform(html))
 
     def test_pseudo_selectors_are_not_inlined(self):
         """
         Pseudo selectors should not be in-lined.
         """
-
-        html = read_html_file('test_pseudo_selectors_are_not_inlined_input.html')
-        expected_output = read_html_file('test_pseudo_selectors_are_not_inlined_expected.html')
-        compare_html(expected_output, Inlinify().transform(html))
+        with read_html_file('test_pseudo_selectors_are_not_inlined_input.html') as html:
+            with read_html_file('test_pseudo_selectors_are_not_inlined_expected.html') as expected_output:
+                compare_html(expected_output, Inlinify().transform(html))
 
     def test_parse_style_rules(self):
         """
         CSS should be parsed correctly.
         """
-
         p = Inlinify()  # won't need the html
         func = p.css_parser.parse
-        rules, leftover = func(read_css_file('test_parse_style_rules.css'), 0)
+
+        with read_css_file('test_parse_style_rules.css') as css:
+            rules, leftover = func(css, 0)
 
         # 'rules' is a list, turn it into a dict for
         # easier assertion testing
@@ -129,16 +134,16 @@ class Tests(unittest.TestCase):
             rules_dict[k] = v
             rules_specificity[k] = specificity
 
-        ok_('h1' in rules_dict)
-        ok_('h2' in rules_dict)
-        ok_('strong' in rules_dict)
-        ok_('ul li' in rules_dict)
-        eq_(rules_dict['h1'], 'color:red')
-        eq_(rules_dict['h2'], 'color:red')
-        eq_(rules_dict['strong'], 'text-decoration:none')
-        eq_(rules_dict['ul li'], 'list-style:2px')
-        ok_('a:hover' not in rules_dict)
-        eq_(leftover, 'a:hover {text-decoration:underline !important}')
+        assert 'h1' in rules_dict
+        assert 'h2' in rules_dict
+        assert 'strong' in rules_dict
+        assert 'ul li' in rules_dict
+        assert rules_dict['h1'] == 'color:red'
+        assert rules_dict['h2'] == 'color:red'
+        assert rules_dict['strong'] == 'text-decoration:none'
+        assert rules_dict['ul li'] == 'list-style:2px'
+        assert 'a:hover' not in rules_dict
+        assert leftover == 'a:hover {text-decoration:underline !important}'
 
     def test_precedence_comparison(self):
         """
@@ -146,153 +151,154 @@ class Tests(unittest.TestCase):
         """
 
         p = Inlinify()
-        rules, leftover = p.css_parser.parse(read_css_file('test_precedence_comparison.css'), 0)
+
+        with read_css_file('test_precedence_comparison.css') as css:
+            rules, leftover = p.css_parser.parse(css, 0)
 
         # 'rules' is a list, turn it into a dict for easier assertion testing
         rules_specificity = {k: specificity for specificity, k, v in rules}
 
         # Last in file wins
-        ok_(rules_specificity['h1'] < rules_specificity['h2'])
+        assert rules_specificity['h1'] < rules_specificity['h2']
 
         # More elements wins
-        ok_(rules_specificity['strong'] < rules_specificity['ul li'])
+        assert rules_specificity['strong'] < rules_specificity['ul li']
 
         # IDs trump everything
-        ok_(rules_specificity['div li.example p.sample'] < rules_specificity['#identified'])
+        assert rules_specificity['div li.example p.sample'] < rules_specificity['#identified']
 
         # Classes trump multiple elements
-        ok_(rules_specificity['ul li'] < rules_specificity['.class-one'])
+        assert rules_specificity['ul li'] < rules_specificity['.class-one']
 
         # An element with a class is more specific than just an element
-        ok_(rules_specificity['div'] < rules_specificity['div.with-class'])
+        assert rules_specificity['div'] < rules_specificity['div.with-class']
 
         # Two classes is better than one
-        ok_(rules_specificity['.class-one'] < rules_specificity['.class-one.class-two'])
+        assert rules_specificity['.class-one'] < rules_specificity['.class-one.class-two']
 
     def test_base_url_option(self):
         """
         If using the base_url option URL's in the HTML should be updated.
         """
 
-        html = read_html_file('test_base_url_option_input.html')
-        expected_output = read_html_file('test_base_url_option_expected.html')
-
-        p = Inlinify(
-            base_url='http://kungfupeople.com',
-            preserve_internal_links=True
-        )
-        result_html = p.transform(html)
-        compare_html(expected_output, result_html)
+        with read_html_file('test_base_url_option_input.html') as html:
+            with read_html_file('test_base_url_option_expected.html') as expected_output:
+                p = Inlinify(
+                    base_url='http://kungfupeople.com',
+                    preserve_internal_links=True
+                )
+                result_html = p.transform(html)
+                compare_html(expected_output, result_html)
 
     def test_style_block_with_external_urls(self):
         """
         CSS rules with external URL's should be handled correctly.
         """
 
-        html = read_html_file('test_style_block_with_external_urls_input.html')
-        expected_output = read_html_file('test_style_block_with_external_urls_expected.html')
-        result_html = Inlinify().transform(html)
-        compare_html(expected_output, result_html)
+        with read_html_file('test_style_block_with_external_urls_input.html') as html:
+            with read_html_file('test_style_block_with_external_urls_expected.html') as expected_output:
+                result_html = Inlinify().transform(html)
+                compare_html(expected_output, result_html)
 
     def test_css_with_html_attributes(self):
         """
         HTML attributes should be applied where appropriate.
         """
 
-        html = read_html_file('test_style_block_with_external_urls_input.html')
-        expected_output = read_html_file('test_style_block_with_external_urls_expected.html')
-        result_html = Inlinify().transform(html)
-        compare_html(expected_output, result_html)
+        with read_html_file('test_style_block_with_external_urls_input.html') as html:
+            with read_html_file('test_style_block_with_external_urls_expected.html') as expected_output:
+                result_html = Inlinify().transform(html)
+                compare_html(expected_output, result_html)
 
     def test_mailto_url(self):
         """
         'mailto:' links should not be affected when using the base_url option.
         """
 
-        html = read_html_file('test_mailto_url.html')
-        p = Inlinify(base_url='http://kungfupeople.com')
-        compare_html(html, p.transform(html))
+        with read_html_file('test_mailto_url.html') as html:
+            p = Inlinify(base_url='http://kungfupeople.com')
+            compare_html(html, p.transform(html))
 
     def test_last_child(self):
         """
         :last-child selector should work correctly.
         """
 
-        html = read_html_file('test_last_child_input.html')
-        expected_output = read_html_file('test_last_child_expected.html')
-        compare_html(expected_output, Inlinify().transform(html))
+        with read_html_file('test_last_child_input.html') as html:
+            with read_html_file('test_last_child_expected.html') as expected_output:
+                compare_html(expected_output, Inlinify().transform(html))
 
     def test_nth_child(self):
         """
         :nth-child selector should work correctly.
         """
 
-        html = read_html_file('test_nth_child_input.html')
-        expected_output = read_html_file('test_nth_child_expected.html')
-        compare_html(expected_output,
-                     Inlinify(css_files=[css_path('test_nth_child.css')]).transform(html))
+        with read_html_file('test_nth_child_input.html') as html:
+            with read_html_file('test_nth_child_expected.html') as expected_output:
+                compare_html(expected_output,
+                             Inlinify(css_files=[css_path('test_nth_child.css')]).transform(html))
 
     def test_child_selector(self):
         """
         CSS child selectors should work correctly.
         """
 
-        html = read_html_file('test_child_selector_input.html')
-        expected_output = read_html_file('test_child_selector_expected.html')
-        compare_html(expected_output, Inlinify().transform(html))
+        with read_html_file('test_child_selector_input.html') as html:
+            with read_html_file('test_child_selector_expected.html') as expected_output:
+                compare_html(expected_output, Inlinify().transform(html))
 
     def test_doctype(self):
         """
         If the HTML contains a doctype it should not be removed.
         """
-        html = read_html_file('test_doctype.html')
-        compare_html(html, Inlinify().transform(html))
+        with read_html_file('test_doctype.html') as html:
+            compare_html(html, Inlinify().transform(html))
 
     def test_multiple_style_elements(self):
         """
         If the HTML has multiple <style> tags they should all be processed.
         """
 
-        html = read_html_file('test_multiple_style_elements_input.html')
-        expected_output = read_html_file('test_multiple_style_elements_expected.html')
-        compare_html(expected_output, Inlinify().transform(html))
+        with read_html_file('test_multiple_style_elements_input.html') as html:
+            with read_html_file('test_multiple_style_elements_expected.html') as expected_output:
+                compare_html(expected_output, Inlinify().transform(html))
 
     def test_parsing_from_css_local_file(self):
         """
         CSS from a local file should be correctly handled.
         """
 
-        html = read_html_file('test_parsing_from_css_local_file_input.html')
-        expected_output = read_html_file('test_parsing_from_css_local_file_expected.html')
+        with read_html_file('test_parsing_from_css_local_file_input.html') as html:
+            with read_html_file('test_parsing_from_css_local_file_expected.html') as expected_output:
 
-        p = Inlinify(css_files=[css_path('test_parsing_from_css_local_file.css')])
-        result_html = p.transform(html)
-        compare_html(expected_output, result_html)
+                p = Inlinify(css_files=[css_path('test_parsing_from_css_local_file.css')])
+                result_html = p.transform(html)
+                compare_html(expected_output, result_html)
 
     def test_style_attribute_specificity(self):
         """
         Styles already present in an elements 'style' tag should win over all else.
         """
 
-        html = read_html_file('test_style_attribute_specificity_input.html')
-        expected_output = read_html_file('test_style_attribute_specificity_expected.html')
-        compare_html(expected_output, Inlinify().transform(html))
+        with read_html_file('test_style_attribute_specificity_input.html') as html:
+            with read_html_file('test_style_attribute_specificity_expected.html') as expected_output:
+                compare_html(expected_output, Inlinify().transform(html))
 
     def test_xml(self):
         """
         Styles already present in an elements 'style' tag should win over all else.
         """
-        html = read_html_file('test_xml.html')
-        expected_output = read_html_file('test_xml_expected.html')
-        css_style_path = css_path('test_xml.css')
-        compare_html(expected_output, Inlinify(method='xml',
-                                               css_files=[css_style_path]).transform(html))
+        with read_html_file('test_xml.html') as html:
+            with read_html_file('test_xml_expected.html') as expected_output:
+                css_style_path = css_path('test_xml.css')
+                compare_html(expected_output, Inlinify(method='xml',
+                                                       css_files=[css_style_path]).transform(html))
 
     def test_external_css(self):
         """
         Styles already present in an elements 'style' tag should win over all else.
         """
-        html = read_html_file('test_external_css_input.html')
-        expected_output = read_html_file('test_external_css_expected.html')
-        css_style_path = css_path('test_external_css.css')
-        compare_html(expected_output, Inlinify(css_files=[css_style_path]).transform(html))
+        with read_html_file('test_external_css_input.html') as html:
+            with read_html_file('test_external_css_expected.html') as expected_output:
+                css_style_path = css_path('test_external_css.css')
+                compare_html(expected_output, Inlinify(css_files=[css_style_path]).transform(html))

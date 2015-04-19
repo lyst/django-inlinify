@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='django-inlinify',
-    version='0.0.15',
+    version='0.0.16',
     description="In-lines CSS into HTML and leverages Django's caching framework.",
     long_description="In-lines CSS into HTML and leverages Django's caching framework.",
     keywords='html lxml email mail style',
@@ -18,14 +18,14 @@ setup(
     ],
     packages=find_packages(),
     include_package_data=True,
-    test_suite='nose.collector',
-    tests_require=['nose'],
     zip_safe=False,
     install_requires=[
+        'six',
         'lxml',
         'cssselect',
         'cssutils',
         'django>=1.5',
         'requests',
+        'tox'
     ]
 )

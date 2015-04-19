@@ -55,11 +55,18 @@ DJANGO_INLINIFY_CSSLOADER_CACHE_KEY_TTL
 Running tests
 ----
 
+The best way to run tests is to do it using `tox` so they run in different environments, ensuring compatiblity with
+different python versions
+
 ```python
-DJANGO_SETTINGS_MODULE="django_inlinify.test_settings" python setup.py test
+# install tox if you haven't already
+pip install tox
+
+# run it
+tox
 ```
 
 Version
 ----
 
-0.0.13
+0.0.16
