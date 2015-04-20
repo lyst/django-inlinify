@@ -1,15 +1,21 @@
-import re
-import logging
-import requests
-import cssutils
-from django.core.cache import get_cache, InvalidCacheBackendError
-from django.conf import settings
-from django_inlinify import defaults
-from StringIO import StringIO
+from __future__ import absolute_import, unicode_literals
+
 from contextlib import closing
 from hashlib import md5
+import logging
+import re
 
-log = logging.getLogger('django_inlinify.css_loader')
+import cssutils
+import requests
+
+from django.core.cache import get_cache, InvalidCacheBackendError
+from django.conf import settings
+
+from django_inlinify import defaults
+
+from six import StringIO
+
+log = logging.getLogger(__name__)
 
 DJANGO_INLINIFY_DEFAULT_CACHE_BACKEND_NAME = getattr(
     settings,
@@ -145,7 +151,7 @@ class CSSParser(object):
         self.include_star_selectors = kwargs.get('include_star_selectors', False)
 
     def _get_cache_key(self, css_body, index):
-        h = md5(str(css_body)).hexdigest()
+        h = md5(str(css_body).encode('utf-8')).hexdigest()
         return '%s_contents_%s_%s' % (self.DJANGO_INLINIFY_CSSPARSER_CACHE_KEY_PREFIX, h, index)
 
     def _get_cached_css(self, css_body, index):
@@ -266,7 +272,8 @@ class CSSParser(object):
         old_style_dict = self._css_string_to_dict(old_style)
         style_dict = self._css_string_to_dict(new_style)
         old_style_dict.update(style_dict)
-        return '; '.join(['%s:%s' % (k, v) for k, v in sorted(old_style_dict.iteritems())])
+
+        return '; '.join(['%s:%s' % (k, v) for k, v in sorted(old_style_dict.items())])
 
     def _unbalanced(self, text):
         """

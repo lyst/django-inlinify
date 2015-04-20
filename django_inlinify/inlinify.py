@@ -1,18 +1,15 @@
 from __future__ import absolute_import, unicode_literals
+
 import operator
 import re
-import sys
-if sys.version_info >= (3, ):  # pragma: no cover
-    # As in, Python 3
-    from urllib.parse import urljoin
-    STR_TYPE = str
-else:  # Python 2
-    from urlparse import urljoin
-    STR_TYPE = basestring
+
+from django_inlinify.css_tools import CSSLoader, CSSParser
+
+from six.moves.urllib.parse import urljoin
 
 from lxml import etree
 from lxml.cssselect import CSSSelector
-from django_inlinify.css_tools import CSSLoader, CSSParser
+
 
 __all__ = ['Inlinify']
 
@@ -154,7 +151,7 @@ class Inlinify(object):
     def _reapply_original_inline_styles(self, original):
         """Re-applies all the initial inline styles
         """
-        for item, inline_style in original.iteritems():
+        for item, inline_style in original.items():
             if not inline_style:
                 continue
             self._update_element_style(item, item.attrib.get('style', ''), inline_style)
