@@ -8,7 +8,7 @@ import re
 import cssutils
 import requests
 
-from django.core.cache import get_cache, InvalidCacheBackendError
+from django.core.cache import caches, InvalidCacheBackendError
 from django.conf import settings
 
 from django_inlinify import defaults
@@ -45,13 +45,13 @@ def load_cache(cache_name):
         cache object
     """
     if not cache_name:
-        return get_cache(DJANGO_INLINIFY_DEFAULT_CACHE_BACKEND_NAME)
+        return caches[DJANGO_INLINIFY_DEFAULT_CACHE_BACKEND_NAME]
     try:
-        cache = get_cache(cache_name)
+        cache = caches[cache_name]
     except InvalidCacheBackendError:
         log.error('The cache you specified (%s) is not defined in settings. Falling back to '
                   'the default one (%s)', cache_name, DJANGO_INLINIFY_DEFAULT_CACHE_BACKEND_NAME)
-        cache = get_cache(DJANGO_INLINIFY_DEFAULT_CACHE_BACKEND_NAME)
+        cache = caches[DJANGO_INLINIFY_DEFAULT_CACHE_BACKEND_NAME]
     return cache
 
 
